@@ -20,6 +20,7 @@ input,select,textarea{width:100%;padding:9px;font-size:16px;border:1px solid #aa
 <script>
 // ================= データ（スマホの中に、持つ） =================
 const L = LifePilot, $ = id => document.getElementById(id);
+const 既定のクライアントID = "207746409667-k82tseegkc8ufkm9jj1ddam877mmj8tn.apps.googleusercontent.com";   // Google の「名前札」。秘密ではない
 const 空データ = () => ({ tasks: [], deposits: [], state_logs: [], seals: [], suggestion_log: [], focus_log: [], values: { 答え: {}, 今日はやめた: {} } });
 let データ = 空データ(), 設定 = null, 画面 = (decodeURIComponent(location.hash.slice(1)) || "提案"), 時計 = null, 今の提案 = null, 今の空き = 0, 五分の記録 = null;
 function 保存() { try { localStorage.setItem("lifepilot_data", JSON.stringify(データ)); } catch (e) { 出す("保存できませんでした（保存先がいっぱいか、使えない設定です）", true); } }
@@ -127,7 +128,7 @@ function 提案画面() {
 function 提案を出す() {
   $("空き").querySelectorAll("button").forEach(b => b.classList.toggle("選ばれ", Number(b.dataset.v) === 今の空き));
   const { 状態, 体, 低, 電池 } = 状態の引数(), r = L.提案(データ, 設定, 今の空き, 体, 低, new Date(), 電池);
-  const 戻す = r.あとでの件数 ? `<p><button class="押す" id="戻す">あとでにした物を戻す（${r.あとでの件数}件）</button></p>` : "";
+  const 戻す = r.あとでの件数 ? `<p><button class="押す" id="戻す">今やらないにした物を戻す（${r.あとでの件数}件）</button></p>` : "";
   if (r.候補なし) { 今の提案 = null; $("カード").innerHTML = `<div class="カード"><p class="一手">${安全(r.文)}</p>${戻す}</div>`; }
   else {
     今の提案 = { id: L.提案を記録(データ, r, 今の空き, 状態 ? { 体, 気分: 低 ? "低" : "ふつう以上", 電池 } : null), タスク: r.一手 }; 保存();
@@ -140,7 +141,12 @@ function 提案を出す() {
 }
 function 反応する(x) {
   if (x === "やる") { try { L.反応を記録(データ, 設定, 今の提案.id, "やる"); } catch (e) { return; } 保存(); return 五分を始める(今の提案.タスク); }
-  if (x === "あとで") { L.反応を記録(データ, 設定, 今の提案.id, "あとで"); 保存(); return 提案を出す(); }
+  if (x === "今やらない") {
+    $("理由欄").innerHTML = `<p class="小">理由を選ぶか、自分の言葉で書いてください（どちらか）。</p><div class="選択">${設定.柱A.今やらないの理由.map(y => `<button data-n="${y}">${y}</button>`).join("")}</div><input id="自由" placeholder="自分の言葉で理由を書く"><button class="押す" id="自由で">この理由で、決める</button><p id="通知"></p>`;
+    const 決める = 理由 => { try { L.反応を記録(データ, 設定, 今の提案.id, "今やらない", 理由, $("自由").value); 保存(); 提案を出す(); } catch (e) { 出す(e.message, true); } };
+    $("理由欄").querySelectorAll("[data-n]").forEach(b => b.onclick = () => 決める(b.dataset.n)); $("自由で").onclick = () => 決める(null);
+    return;
+  }
   $("理由欄").innerHTML = `<p class="小">今日はやらない理由を選んでください。</p><div class="選択">${設定.柱A.やらない理由.map(y => `<button data-y="${y}">${y}</button>`).join("")}</div><input id="自由" placeholder="ひとこと（「その他」は必須）"><p id="通知"></p>`;
   $("理由欄").querySelectorAll("[data-y]").forEach(b => b.onclick = () => {
     try { L.反応を記録(データ, 設定, 今の提案.id, "今日はやらない", b.dataset.y, $("自由").value); 保存(); 提案を出す(); } catch (e) { 出す(e.message, true); }
@@ -167,7 +173,7 @@ function 五分を終える(結果) {
 // ================= 同期（Google ドライブ） =================
 function 最後の同期() { try { return JSON.parse(localStorage.getItem("lifepilot_lastsync") || "null"); } catch (e) { return null; } }
 function 同期画面() {
-  const 前 = 最後の同期(), id = (() => { try { return localStorage.getItem("lifepilot_clientid") || ""; } catch (e) { return ""; } })();
+  const 前 = 最後の同期(), id = (() => { try { return localStorage.getItem("lifepilot_clientid") || 既定のクライアントID; } catch (e) { return 既定のクライアントID; } })();
   $("本体").innerHTML = `<h1>同期</h1>
     <div class="カード"><p>ボタン1つで、Mac と、このスマホの記録を、そろえます（自分の Google ドライブの中の、1つのファイルを使います）。</p>
     <button class="押す 濃" id="同期ボタン" style="font-size:18px;padding:14px 26px">同期する</button> <span id="通知"></span>

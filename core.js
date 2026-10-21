@@ -73,7 +73,7 @@
     for (const r of データ.suggestion_log) {
       最後に出した[r.候補id] = r.日時;
       if (r.反応 && (r.反応の日時 || "").startsWith(今日)) {
-        if (r.反応 === "あとで") { if (!r.リセット済み) あとで.add(r.候補id); }
+        if (r.反応 === "今やらない" || r.反応 === "あとで") { if (!r.リセット済み) あとで.add(r.候補id); }
         else if (r.反応 === "今日はやらない") やらない.add(r.候補id);
       }
     }
@@ -150,6 +150,10 @@
   function 反応を記録(データ, 設定, 提案id, 反応, 理由 = null, 自由記述 = "", 今 = new Date()) {
     const 柱A = 設定.柱A;
     if (!柱A.反応の選択肢.includes(反応)) throw new Error("反応は " + 柱A.反応の選択肢.join("・") + " のどれかです");
+    if (反応 === "今やらない") {
+      if (理由 !== null && !柱A.今やらないの理由.includes(理由)) throw new Error("「今やらない」の理由は " + 柱A.今やらないの理由.join("・") + " のどれかです");
+      if (理由 === null && !(自由記述 || "").trim()) throw new Error("「今やらない」は、理由を選ぶか、自分の言葉で書いてください");
+    }
     if (反応 === "今日はやらない") {
       if (!柱A.やらない理由.includes(理由)) throw new Error("「今日はやらない」の理由を選んでください");
       if (理由 === "その他" && !(自由記述 || "").trim()) throw new Error("「その他」を選んだ時は、一言を書いてください");
@@ -157,12 +161,12 @@
     const r = データ.suggestion_log.find(x => x.id === 提案id);
     if (!r) throw new Error("その提案はありません");
     if (r.反応 !== null) throw new Error("この提案には、もう反応しています");
-    r.反応 = 反応; r.理由の分類 = 反応 === "今日はやらない" ? 理由 : null; r.自由記述 = (自由記述 || "").trim(); r.反応の日時 = 時刻文字(今);
+    r.反応 = 反応; r.理由の分類 = (反応 === "今日はやらない" || 反応 === "今やらない") ? 理由 : null; r.自由記述 = (自由記述 || "").trim(); r.反応の日時 = 時刻文字(今);
     更新印(r, 今); return r;
   }
   function あとでを戻す(データ, 今 = new Date()) {
     const 今日 = 日付文字(今), 戻した = new Set();
-    for (const r of データ.suggestion_log) if (r.反応 === "あとで" && !r.リセット済み && (r.反応の日時 || "").startsWith(今日)) { r.リセット済み = true; 更新印(r, 今); 戻した.add(r.候補id); }
+    for (const r of データ.suggestion_log) if ((r.反応 === "今やらない" || r.反応 === "あとで") && !r.リセット済み && (r.反応の日時 || "").startsWith(今日)) { r.リセット済み = true; 更新印(r, 今); 戻した.add(r.候補id); }
     return 戻した.size;
   }
 
