@@ -6,7 +6,7 @@
 *{box-sizing:border-box} body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;background:var(--bg);color:var(--text);padding-bottom:84px}
 main{max-width:640px;margin:0 auto;padding:16px 16px 0} h1{font-size:19px;margin:6px 0 10px} h2{font-size:15px;margin:18px 0 6px}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;border:none;background:none;padding:12px 2px;font-size:12px;color:var(--sub)} nav button.今{color:var(--text);font-weight:bold;border-top:3px solid var(--accent);margin-top:-1px}
+nav{overflow-x:auto} nav button{flex:1 0 auto;min-width:72px;border:none;background:none;padding:12px 2px;font-size:12px;color:var(--sub)} nav button.今{color:var(--text);font-weight:bold;border-top:3px solid var(--accent);margin-top:-1px}
 .カード{border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-top:10px;background:var(--card)} .一手{font-size:21px;font-weight:bold;margin:0 0 6px}
 button.押す,.行ボタン button{padding:10px 16px;font-size:15px;border:1px solid #888;border-radius:8px;background:#fff;margin:4px 6px 4px 0} button.濃{background:var(--accent);color:#fff;border-color:var(--accent)}
 input,select,textarea{width:100%;padding:9px;font-size:16px;border:1px solid #aaa;border-radius:8px;background:#fff;margin-top:3px} textarea{height:100px} label{display:block;margin-top:12px;font-size:13px;color:var(--sub)}
@@ -34,11 +34,11 @@ function 出す(文, エラー) { const e = $("通知"); if (e) { e.className = 
 const 安全 = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // ================= 画面の切り替え =================
-const 画面一覧 = [["提案", "今なにする？"], ["タスク", "タスク"], ["預ける", "預ける"], ["状態", "体と気分"], ["同期", "同期"]];
+const 画面一覧 = [["提案", "今なにする？"], ["タスク", "タスク"], ["預ける", "預ける"], ["夜", "夜の封印"], ["ニュース", "ニュース"], ["状態", "体と気分"], ["同期", "同期"]];
 function 描く() {
   clearInterval(時計);
   $("タブ").innerHTML = 画面一覧.map(([k, 名]) => `<button class="${k === 画面 ? "今" : ""}" onclick="移る('${k}')">${名}</button>`).join("");
-  ({ 提案: 提案画面, タスク: タスク画面, 預ける: 預ける画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
+  ({ 提案: 提案画面, タスク: タスク画面, 預ける: 預ける画面, 夜: 夜画面, ニュース: ニュース画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
 }
 function 移る(k) { 画面 = k; 描く(); }
 
@@ -105,10 +105,70 @@ function 預ける画面() {
     <label>種類（なくてもよい）</label><select id="種類"><option value="">（付けない）</option>${s.預ける種類.map(x => `<option>${x}</option>`).join("")}</select>
     <label>いつ、返してもらいますか</label><select id="返す">${s.返す日の選択肢.map(x => `<option>${x.名前}</option>`).join("")}</select>
     <button class="押す 濃" id="預けボタン">預ける</button> <span id="通知"></span></div>
-    <p class="小">預けた記録は、Mac で、受け取り箱に届きます（スマホ版の受け取り箱は、次の段階で作ります）。</p>`;
+    <div id="箱"></div>`;
   $("預けボタン").onclick = () => {
     try { const d = L.預ける(データ, 設定, $("本文").value, $("種類").value || null, $("返す").value); 保存(); 預ける画面(); setTimeout(() => 出す("預けました。" + (d.返す日 ? d.返す日 + " に、届きます。" : "記録だけ残します。")), 0); } catch (e) { 出す(e.message, true); }
   };
+  箱を描く();
+}
+// ---- 受け取り箱（返す日が来た預け。開くのは本人。催促はしない） ----
+function 箱を描く(開く = null) {
+  const 件 = L.箱の中身(データ);
+  if (開く !== null) {
+    let r; try { r = L.預けを開く(データ, 開く); 保存(); } catch (e) { $("箱").innerHTML = `<p class="エラー">${安全(e.message)}</p>`; return; }
+    $("箱").innerHTML = `<h2>受け取り箱</h2><div class="カード"><p class="小">過去の自分から（${安全(r.日付.slice(0, 16))}）</p><p style="font-size:18px;white-space:pre-wrap" id="預け本文"></p>
+      <p class="小">${r.体 !== null || r.気分 ? "預けた時：体" + (r.体 ?? "—") + "%・気分" + (r.気分 ?? "—") : "預けた時の体と気分：入力なし"}</p>
+      <div class="行ボタン"><button data-x="いまも同じ">いまも同じ</button><button data-x="変わった">変わった</button><button data-x="消す">消す</button><button data-x="閉じる">いまは閉じる</button></div><div id="預け直し"></div><span id="通知"></span></div>`;
+    $("預け本文").textContent = r.本文;                       // 記録そのまま（AIの解釈なし）
+    $("箱").querySelectorAll("[data-x]").forEach(b => b.onclick = () => {
+      const x = b.dataset.x;
+      if (x === "閉じる") return 箱を描く();
+      if (x === "変わった" && !$("新しい")) {
+        $("預け直し").innerHTML = `<p class="小">いまの一言を、あらためて預けますか（書かなくてもかまいません）。</p><textarea id="新しい"></textarea><select id="新しい返す">${設定.柱B.返す日の選択肢.map(y => `<option>${y.名前}</option>`).join("")}</select><button class="押す 濃" id="決める">決める</button>`;
+        $("決める").onclick = () => 反応を決める(r.id, "変わった"); return;
+      }
+      if (x === "消す" && !confirm("この預けを消します。よいですか？")) return;
+      反応を決める(r.id, x);
+    });
+    return;
+  }
+  $("箱").innerHTML = `<h2>受け取り箱${件.length ? "（" + 件.length + "件）" : ""}</h2>` + (件.length
+    ? 件.map(r => `<div class="カード"><span class="小">${安全(r.日付.slice(0, 10))} に預けた分（${安全(r.返す日)} に届きました）</span><br><button class="押す" data-id="${r.id}">開く</button></div>`).join("")
+    : '<p class="小">受け取り箱は、いま、空です。</p>');
+  $("箱").querySelectorAll("[data-id]").forEach(b => b.onclick = () => 箱を描く(Number(b.dataset.id)));
+}
+function 反応を決める(id, 反応) {
+  try { L.預けに反応する(データ, 設定, id, 反応, $("新しい") ? $("新しい").value : null, $("新しい返す") ? $("新しい返す").value : "なし"); 保存(); 箱を描く(); } catch (e) { 出す(e.message, true); }
+}
+
+// ================= 夜の封印 =================
+function 夜画面() {
+  const 生 = L.生きている(データ.tasks), 封 = L.今の封(データ), 封タスク = 封 && 生.find(t => t.id === 封.タスクid);
+  $("本体").innerHTML = `<h1>夜の封印</h1><p class="小">今日の迷いをひとつ預けて、朝の5分でやることを、ひとつ決めて封をします。迷いがない夜は、預けずに、封をするだけでかまいません。</p>
+    <div class="カード"><b>① 迷いを預ける（なくてもよい）</b><textarea id="本文" placeholder="迷っていること"></textarea>
+    <label>いつ、返してもらいますか</label><select id="返す">${設定.柱B.返す日の選択肢.map(x => `<option>${x.名前}</option>`).join("")}</select>
+    <button class="押す" id="預けボタン">預ける</button> <span class="小" id="預けた"></span></div>
+    <div class="カード"><b>② 朝の5分でやることを、ひとつ決めて封をする</b>
+    <label>タスク</label><select id="タスク">${生.map(t => `<option value="${t.id}">${安全(t.内容)}（${t.見積もり分}分）</option>`).join("")}</select>
+    <button class="押す 濃" id="封ボタン">封をする</button><button class="押す" id="やめるボタン">封を、やめる</button> <span id="通知"></span>
+    ${封タスク ? `<p class="小">いま、封がしてあります：<b>${安全(封タスク.内容)}</b>（${安全(封.対象日)} の朝に、「今なにする？」の上に出ます）</p>` : ""}</div>`;
+  $("預けボタン").onclick = () => { const 本文 = $("本文").value.trim(); if (!本文) { $("預けた").textContent = "（迷いがない夜は、預けずに、次へ進めます）"; return; }
+    try { L.預ける(データ, 設定, 本文, "迷い", $("返す").value); 保存(); $("本文").value = ""; $("預けた").textContent = "預けました"; } catch (e) { $("預けた").textContent = e.message; } };
+  $("封ボタン").onclick = () => { try { L.封じる(データ, 設定, Number($("タスク").value)); 保存(); 夜画面(); setTimeout(() => 出す("封をしました。おやすみなさい。"), 0); } catch (e) { 出す(e.message, true); } };
+  $("やめるボタン").onclick = () => { L.封をやめる(データ); 保存(); 夜画面(); setTimeout(() => 出す("封を、やめました。"), 0); };
+}
+
+// ================= ニュース（見るだけ。Mac で集めた見出しを、同期で受け取る） =================
+function ニュース画面() {
+  let ニュース = []; try { ニュース = JSON.parse(localStorage.getItem("lifepilot_news") || "[]"); } catch (e) {}
+  const 並び = L.ニュースを並べる(ニュース, 設定);
+  $("本体").innerHTML = `<h1>ニュース</h1><p class="小">Yahoo!ニュースの「IT」の見出しです（個人利用のみ）。Mac で「更新」して、同期すると、ここに届きます。スマホからは、更新できません。</p><div id="一覧"></div>`;
+  $("一覧").innerHTML = 並び.length ? "" : '<p class="小">見出しが、まだ、ありません。Mac で、ニュースを更新して、同期してください。</p>';
+  for (const r of 並び) {
+    const 行 = document.createElement("div"); 行.className = "カード"; 行.innerHTML = `<a target="_blank" rel="noopener" style="font-weight:bold;color:#222;text-decoration:none"></a><br><span class="小"></span>`;
+    const a = 行.querySelector("a"); a.textContent = (r.合う語.length ? "★ " : "") + r.見出し; a.href = r.リンク;
+    行.querySelector(".小").textContent = (r.掲載日時 || "") + "　" + (r.理由 || ""); $("一覧").appendChild(行);
+  }
 }
 
 // ================= 今なにする？ =================
@@ -121,9 +181,26 @@ function 提案画面() {
   $("本体").innerHTML = `<h1>今なにする？</h1>
     <p class="小">${状態 ? `使っている入力：体${状態.体}%・気分${状態.気分}${状態.電池 !== null ? "・電池" + 状態.電池 + "%" : ""}` : "入力がないので、体と気分は使っていません。「体と気分」から入れられます。"}</p>
     <p>空き時間を選んでください。</p><div class="選択" id="空き">${選択肢.map((x, i) => `<button data-v="${x}">${x}分${i === 選択肢.length - 1 ? "以上" : ""}</button>`).join("")}</div>
-    <div id="カード"></div>`;
+    <div id="封印"></div><div id="カード"></div><div id="問い"></div>`;
+  封印を出す(); 問いを出す();
   $("空き").onclick = e => { const b = e.target.closest("button"); if (!b) return; 今の空き = Number(b.dataset.v); 提案を出す(); };
   if (今の空き) 提案を出す();
+}
+function 封印を出す() {
+  const r = L.今日の封印(データ); if (!r) { $("封印").innerHTML = ""; return; }
+  $("封印").innerHTML = `<div class="カード"><p class="小">昨夜、封をした、朝の5分です</p><p class="一手"></p><div class="行ボタン"><button class="押す 濃" id="封始める">5分だけ、やる</button><button class="押す" id="封見送る">今日はやらない</button></div></div>`;
+  $("封印").querySelector(".一手").textContent = r.タスク.内容;
+  $("封始める").onclick = () => { L.封を済にする(データ, r.id, "始めた"); 保存(); 五分を始める(r.タスク); };
+  $("封見送る").onclick = () => { L.封を済にする(データ, r.id, "今日はやらない"); 保存(); $("封印").innerHTML = ""; };
+}
+function 問いを出す() {
+  const q = L.次の問い(データ, 設定); if (!q) { $("問い").innerHTML = ""; return; }
+  $("問い").innerHTML = `<div class="カード" style="border-style:dashed"><p class="小">ひとつだけ、聞いてもいいですか（答えなくてもかまいません）</p><p><b>${安全(q.問い)}</b></p>
+    <div class="選択">${q.選択肢.map(x => `<button data-s="${安全(x)}">${安全(x)}</button>`).join("")}</div><input id="問いの一言" placeholder="ひとこと（選ばずに、書くだけでもよい）">
+    <div class="行ボタン"><button class="押す" id="一言で">この一言で答える</button><button class="押す" id="今日はやめる">今日はやめておく</button></div><p id="問いの通知" class="エラー"></p></div>`;
+  const 答える = 選択 => { try { L.価値観に答える(データ, 設定, q.キー, 選択, $("問いの一言").value); 保存(); 問いを出す(); } catch (e) { $("問いの通知").textContent = e.message; } };
+  $("問い").querySelectorAll("[data-s]").forEach(b => b.onclick = () => 答える(b.dataset.s)); $("一言で").onclick = () => 答える(null);
+  $("今日はやめる").onclick = () => { L.価値観を今日はやめる(データ, 設定, q.キー); 保存(); 問いを出す(); };
 }
 function 提案を出す() {
   $("空き").querySelectorAll("button").forEach(b => b.classList.toggle("選ばれ", Number(b.dataset.v) === 今の空き));

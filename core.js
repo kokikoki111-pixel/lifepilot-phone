@@ -218,6 +218,72 @@
   }
 
 
+  // ---------- 受け取り箱（Mac 版の D2 と同じ決まり） ----------
+  function 箱の中身(データ, 今 = new Date()) {
+    const 今日 = 日付文字(今);
+    return 生きている(データ.deposits).filter(r => r.返す日 && r.返す日 <= 今日 && r.反応 === null);
+  }
+  function 預けを開く(データ, 番号, 今 = new Date()) {
+    const 箱 = new Set(箱の中身(データ, 今).map(r => r.id)), r = データ.deposits.find(x => x.id === 番号 && !x.削除);
+    if (!r) throw new Error("その預けはありません");
+    if (!箱.has(番号)) throw new Error("その預けは、受け取り箱にありません");
+    if (r.受け取った日 === null) { r.受け取った日 = 日付文字(今); 更新印(r, 今); }
+    return r;
+  }
+  function 預けに反応する(データ, 設定, 番号, 反応, 新しい本文 = null, 返す選択 = "なし", 今 = new Date()) {
+    if (!["いまも同じ", "変わった", "消す"].includes(反応)) throw new Error("反応は、いまも同じ・変わった・消す のどれかです");
+    預けを開く(データ, 番号, 今);
+    let 新しい預け = null;
+    if (反応 === "変わった" && (新しい本文 || "").trim()) 新しい預け = 預ける(データ, 設定, 新しい本文, null, 返す選択, 今);   // 先に預け直す（失敗したら、元は変えない）
+    const r = データ.deposits.find(x => x.id === 番号);
+    if (反応 === "消す") 削除印(r, 今); else { r.反応 = 反応; 更新印(r, 今); }
+    return 新しい預け;
+  }
+
+  // ---------- 夜の封印（Mac 版の A6 と同じ決まり） ----------
+  function 封じる(データ, 設定, タスクid, 今 = new Date()) {
+    if (!生きている(データ.tasks).some(t => t.id === タスクid)) throw new Error("そのタスクはありません");
+    const 境 = 設定.柱A.夜の封印.朝とみなす境の時, 対象 = new Date(今.getFullYear(), 今.getMonth(), 今.getDate() + (今.getHours() >= 境 ? 1 : 0));
+    for (const r of データ.seals) if (r.状態 === "封中") { r.状態 = "差し替え"; 更新印(r, 今); }
+    const r = 更新印({ id: 新しいid(データ.seals), 封じた日時: 時刻文字(今), 対象日: 日付文字(対象), タスクid, 状態: "封中" }, 今); データ.seals.push(r); return r;
+  }
+  function 封をやめる(データ, 今 = new Date()) { let n = 0; for (const r of データ.seals) if (r.状態 === "封中") { r.状態 = "やめた"; 更新印(r, 今); n++; } return n; }
+  const 今の封 = データ => データ.seals.find(r => r.状態 === "封中") || null;
+  function 今日の封印(データ, 今 = new Date()) {
+    const r = 今の封(データ); if (!r || r.対象日 !== 日付文字(今)) return null;
+    const タスク = 生きている(データ.tasks).find(t => t.id === r.タスクid); return タスク ? Object.assign({}, r, { タスク }) : null;
+  }
+  function 封を済にする(データ, 封id, 結果, 今 = new Date()) {
+    if (!["始めた", "今日はやらない"].includes(結果)) throw new Error("結果は、始めた・今日はやらない のどちらかです");
+    const r = データ.seals.find(x => x.id === 封id && x.状態 === "封中"); if (!r) throw new Error("その封はありません");
+    r.状態 = 結果; 更新印(r, 今);
+  }
+
+  // ---------- 価値観の問い（Mac 版の C1 と同じ決まり） ----------
+  function 次の問い(データ, 設定, 今 = new Date()) {
+    const 今日 = 日付文字(今), v = データ.values || { 答え: {}, 今日はやめた: {} };
+    return (設定.土台2.価値観の問い || []).find(q => !(q.キー in v.答え) && v.今日はやめた[q.キー] !== 今日) || null;
+  }
+  function 価値観に答える(データ, 設定, キー, 選択 = null, 一言 = "", 今 = new Date()) {
+    const q = (設定.土台2.価値観の問い || []).find(x => x.キー === キー); if (!q) throw new Error("その問いはありません");
+    if (選択 !== null && !q.選択肢.includes(選択)) throw new Error("選択肢にない答えです");
+    一言 = (一言 || "").trim(); if (選択 === null && !一言) throw new Error("選択肢を選ぶか、一言を書いてください");
+    データ.values = データ.values || { 答え: {}, 今日はやめた: {} };
+    データ.values.答え[キー] = 更新印({ 選択, 一言, 更新日: 日付文字(今) }, 今);
+  }
+  function 価値観を今日はやめる(データ, 設定, キー, 今 = new Date()) {
+    if (!(設定.土台2.価値観の問い || []).some(x => x.キー === キー)) throw new Error("その問いはありません");
+    データ.values = データ.values || { 答え: {}, 今日はやめた: {} }; データ.values.今日はやめた[キー] = 日付文字(今);
+  }
+
+  // ---------- ニュース（スマホは見るだけ。Mac が集めた見出しを、同期で受け取る） ----------
+  function ニュースを並べる(ニュース, 設定) {
+    const 語 = ((設定.柱E || {}).興味の語 || []).filter(w => w), 件 = (設定.柱E || {}).表示件数 || 50;
+    const 一覧 = (ニュース || []).filter(r => r.反応 !== "いらない").map(r => { const 合う = 語.filter(w => r.見出し.includes(w)); return Object.assign({}, r, { 合う語: 合う, 理由: 合う.length ? "『" + 合う.join("』『") + "』を含むため" : null }); });
+    const 新しい順 = (a, b) => ((b.掲載日時 || b.取得日時) > (a.掲載日時 || a.取得日時) ? 1 : (b.掲載日時 || b.取得日時) < (a.掲載日時 || a.取得日時) ? -1 : 0);
+    return 一覧.filter(r => r.合う語.length).sort(新しい順).concat(一覧.filter(r => !r.合う語.length).sort(新しい順)).slice(0, 件);
+  }
+
   // ---------- 同期（突き合わせ。Mac 版の H1_突き合わせ.py と同じ決まり） ----------
   const 形式の版 = 1, 混ぜる一覧名 = ["tasks", "deposits", "state_logs", "seals", "suggestion_log", "focus_log"];
   const 整列 = v => Array.isArray(v) ? v.map(整列) : (v && typeof v === "object") ? Object.keys(v).sort().reduce((o, k) => (o[k] = 整列(v[k]), o), {}) : v;
@@ -272,6 +338,7 @@
 
   const 公開 = { 締切を整える, 点数, 順位表, 提案, 理由を作る, 残りの言い方, 今日の様子, 新しいid, 更新印, 削除印, 生きている, タスクを足す, タスクを直す, タスクを消す,
                  提案を記録, 反応を記録, あとでを戻す, 五分を始める, 五分を終える, 状態を記録, 使える状態, 預ける, 日付文字, 時刻文字,
-                 一覧を混ぜる, 価値観を混ぜる, 古い削除を消す, 同期を組み立てる, 同期ファイルを確かめる, 同期を実行 };
+                 一覧を混ぜる, 価値観を混ぜる, 古い削除を消す, 同期を組み立てる, 同期ファイルを確かめる, 同期を実行,
+                 箱の中身, 預けを開く, 預けに反応する, 封じる, 封をやめる, 今の封, 今日の封印, 封を済にする, 次の問い, 価値観に答える, 価値観を今日はやめる, ニュースを並べる };
   if (typeof module !== "undefined" && module.exports) module.exports = 公開; else root.LifePilot = 公開;
 })(typeof self !== "undefined" ? self : this);
