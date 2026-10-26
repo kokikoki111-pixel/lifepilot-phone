@@ -342,6 +342,158 @@
     return { 分, 選択: 合う.length ? 合う[合う.length - 1] : null };
   }
 
+  // ---------- 倉庫と寝かせ棚（Mac 版の W1_倉庫.py と同じ決まり。warehouse_items・wishlist は同期の対象） ----------
+  const 倉庫設定 = 設定 => Object.assign({ 動かない日数: 14, 窓口の件数: 3, 寝かせ日数: 3, 理由の最大文字数: 200, 内容の最大文字数: 200, 入口: ["やりたかった", "見つからない"], 選択肢: ["買取", "解体", "焼却", "種"], NPCの言葉: "これは{日数}日、倉庫にあります。" }, (設定 && 設定.倉庫) || {});
+  const 日を足す = (今, n) => new Date(今.getFullYear(), 今.getMonth(), 今.getDate() + n);
+  function 倉庫の内容(内容, 上限) {
+    内容 = (内容 || "").trim(); if (!内容) throw new Error("内容が空です");
+    if (内容.length > 上限) throw new Error("長すぎます（" + 上限 + "文字まで）"); return 内容;
+  }
+  function 倉庫の候補(データ, 設定, 今 = new Date()) {     // 2週間以上触っていないタスク。締切が未来の締切型は出さない（期限切れは出す）
+    const 限 = 日付文字(日を足す(今, -倉庫設定(設定).動かない日数)), 結果 = [];
+    for (const t of 生きている(データ.tasks).filter(t => !t.倉庫)) {
+      if (t.最後に触った日 > 限) continue;
+      if (t.種類 === "締切" && 締切の日時(t.締切) > 今) continue;
+      結果.push(Object.assign({}, t, { 触っていない日数: 日数の差(今, t.最後に触った日) }));
+    }
+    return 結果.sort((a, b) => b.触っていない日数 - a.触っていない日数);
+  }
+  const タスクの控え = t => { const c = {}; for (const k of ["内容", "種類", "重要度", "楽しさの印", "見積もり分", "締切", "間隔日", "画面を使う"]) c[k] = t[k] === undefined ? null : t[k]; return c; };
+  function 倉庫に積む(データ, タスクid, 今 = new Date()) {
+    const t = データ.tasks.find(x => x.id === タスクid && !x.削除 && !x.倉庫);
+    if (!t) throw new Error("そのタスクはありません（もう倉庫にあるかもしれません）");
+    データ.warehouse_items = データ.warehouse_items || [];
+    t.倉庫 = true; t.倉庫に積んだ日 = 日付文字(今); 更新印(t, 今);
+    const r = 更新印({ id: 新しいid(データ.warehouse_items), 内容: t.内容, 入口: "動かない", 置いた日: 日付文字(今), 元のタスクid: t.id, 元のタスク: タスクの控え(t), 処理: "保管中", 処理した日: null, 焼却の理由: null }, 今);
+    データ.warehouse_items.push(r); return r;
+  }
+  function 倉庫に入れる(データ, 設定, 内容, 入口, 今 = new Date()) {
+    const s = 倉庫設定(設定);
+    if (!s.入口.includes(入口)) throw new Error("入口は " + s.入口.join("・") + " のどれかです");
+    内容 = 倉庫の内容(内容, s.内容の最大文字数); データ.warehouse_items = データ.warehouse_items || [];
+    const r = 更新印({ id: 新しいid(データ.warehouse_items), 内容, 入口, 置いた日: 日付文字(今), 元のタスクid: null, 元のタスク: null, 処理: "保管中", 処理した日: null, 焼却の理由: null }, 今);
+    データ.warehouse_items.push(r); return r;
+  }
+  function 窓口(データ, 設定, 今 = new Date()) {           // 保管中の物を、古い順に、3件まで。言葉は、事実の一言だけ
+    const s = 倉庫設定(設定);
+    const 保管 = 生きている(データ.warehouse_items || []).filter(r => r.処理 === "保管中").sort((a, b) => (a.置いた日 < b.置いた日 ? -1 : a.置いた日 > b.置いた日 ? 1 : a.id - b.id));
+    return { 件数: 保管.length, 出す: 保管.slice(0, s.窓口の件数).map(r => Object.assign({}, r, { 一言: s.NPCの言葉.split("{日数}").join(String(日数の差(今, r.置いた日))).split("{内容}").join(r.内容) })) };
+  }
+  function 倉庫で処理(データ, 設定, 物id, 選択, 理由 = null, 部品 = null, 今 = new Date()) {
+    const s = 倉庫設定(設定);
+    if (!s.選択肢.includes(選択)) throw new Error("選択は " + s.選択肢.join("・") + " のどれかです");
+    const r = (データ.warehouse_items || []).find(x => x.id === 物id && !x.削除);
+    if (!r || r.処理 !== "保管中") throw new Error("その物は、窓口にありません");
+    const 元 = データ.tasks.find(x => x.id === r.元のタスクid && !x.削除), 今日 = 日付文字(今);
+    if (理由 !== null) { 理由 = String(理由).trim(); if (理由.length > s.理由の最大文字数) throw new Error("理由が長すぎます（" + s.理由の最大文字数 + "文字まで）"); }
+    const 新しく = 控え => タスクを足す(データ, 設定, { 内容: 控え.内容, 種類: 控え.種類, 重要度: 控え.重要度, 楽しさの印: 控え.楽しさの印, 見積もり分: 控え.見積もり分, 締切: 控え.締切, 間隔日: 控え.間隔日, 画面を使う: 控え.画面を使う !== false }, 今);
+    if (選択 === "買取") {
+      if (元 && 元.倉庫) { delete 元.倉庫; delete 元.倉庫に積んだ日; 元.最後に触った日 = 今日; 更新印(元, 今); }
+      else { let 控え = r.元のタスク || { 内容: r.内容, 種類: "その他", 重要度: 5, 楽しさの印: "ふつう", 見積もり分: 5 }; if (控え.種類 === "締切") 控え = Object.assign({}, 控え, { 種類: "その他", 締切: null }); 新しく(控え); }
+    } else {
+      if (選択 === "解体") {
+        部品 = (部品 || []).map(p => (p || "").trim()).filter(p => p);
+        if (!部品.length) throw new Error("解体は、使える部品を1つ以上、書いてください");
+        const 中身 = 部品.map(p => ({ 内容: 倉庫の内容(p, s.内容の最大文字数), 種類: "その他", 重要度: 5, 楽しさの印: "ふつう", 見積もり分: 5 }));
+        中身.forEach(x => タスクを検査して整える(x, 設定)); 中身.forEach(x => タスクを足す(データ, 設定, x, 今));
+      }
+      if (元 && 元.倉庫) 削除印(元, 今);                         // 焼却・種・解体：元のタスクは消す（控えは、物の記録に残る）
+    }
+    r.処理 = 選択; r.処理した日 = 今日; r.焼却の理由 = 選択 === "焼却" ? (理由 || null) : null;
+    if (選択 === "解体") r.部品 = 部品;
+    更新印(r, 今); return r;
+  }
+  const 灰 = データ => 生きている(データ.warehouse_items || []).filter(r => r.処理 === "焼却").sort((a, b) => (b.処理した日 || "").localeCompare(a.処理した日 || ""));
+  const 種 = データ => 生きている(データ.warehouse_items || []).filter(r => r.処理 === "種").sort((a, b) => (b.処理した日 || "").localeCompare(a.処理した日 || ""));
+  function 灰を戻す(データ, 物id, 今 = new Date()) {
+    const r = (データ.warehouse_items || []).find(x => x.id === 物id && !x.削除);
+    if (!r || !["焼却", "種"].includes(r.処理)) throw new Error("戻せる物ではありません");
+    r.処理 = "保管中"; r.処理した日 = null; r.焼却の理由 = null; 更新印(r, 今); return r;
+  }
+  function 棚に置く(データ, 設定, 物, 今 = new Date()) {
+    const s = 倉庫設定(設定); 物 = 倉庫の内容(物, s.内容の最大文字数); データ.wishlist = データ.wishlist || [];
+    const r = 更新印({ id: 新しいid(データ.wishlist), 物, 置いた日: 日付文字(今), 次に聞く日: 日付文字(日を足す(今, s.寝かせ日数)), 答え: null, 答えた日: null, 買った翌朝の体: null }, 今);
+    データ.wishlist.push(r); return r;
+  }
+  function 棚(データ, 今 = new Date()) {
+    const 日 = 日付文字(今), 一覧 = 生きている(データ.wishlist || []);
+    return { 聞く: 一覧.filter(r => r.答え === null && r.次に聞く日 <= 日), 寝かせ中: 一覧.filter(r => r.答え === null && r.次に聞く日 > 日), 済み: 一覧.filter(r => r.答え !== null) };
+  }
+  function 棚に答える(データ, 設定, id, 答え, 今 = new Date()) {
+    if (!["買う", "やめる", "もう少し置く"].includes(答え)) throw new Error("答えは、買う・やめる・もう少し置く のどれかです");
+    const r = (データ.wishlist || []).find(x => x.id === id && !x.削除 && x.答え === null);
+    if (!r) throw new Error("その物は、もう答え済みか、ありません");
+    if (答え === "もう少し置く") r.次に聞く日 = 日付文字(日を足す(今, 倉庫設定(設定).寝かせ日数)); else { r.答え = 答え; r.答えた日 = 日付文字(今); }
+    更新印(r, 今); return r;
+  }
+  function 翌朝の体を答える(データ, id, 体, 今 = new Date()) {
+    if (!Number.isInteger(体) || 体 < 0 || 体 > 100) throw new Error("体は、0〜100（%）の整数です");
+    const r = (データ.wishlist || []).find(x => x.id === id && !x.削除 && x.答え === "買う");
+    if (!r) throw new Error("買った物ではありません");
+    r.買った翌朝の体 = 体; 更新印(r, 今); return r;
+  }
+  function 棚から外す(データ, id, 今 = new Date()) {
+    const r = (データ.wishlist || []).find(x => x.id === id && !x.削除); if (!r) throw new Error("その物はありません");
+    削除印(r, 今); return r;
+  }
+
+  // ---------- 通信（スマホ版は AI につながらないので、設定の「決めた文」で返す。会話の記録は、この端末の中だけ） ----------
+  function 通信の状況(データ, 設定, 今 = new Date()) {
+    const s = 生活の状態(データ, 設定, 今);
+    return "気分の点数は" + s.点数 + "（" + s.顔 + "）。疲れは" + s.疲れ + "。今日の達成は" + s.今日.達成 + "件、5分だけは" + s.今日.五分 + "回。タスクは" + 生きている(データ.tasks).filter(t => !t.倉庫).length + "件。";
+  }
+  function 通信の返事(設定, 相手, 文, 状況, 乱 = Math.random) {
+    const s = 設定.通信;
+    if (!s.人[相手]) throw new Error("相手は " + Object.keys(s.人).join("・") + " のどれかです");
+    文 = (文 || "").trim(); if (!文) throw new Error("言葉が空です"); if (文.length > 300) throw new Error("長すぎます（300文字まで）");
+    const 深刻 = ["死にたい", "消えたい", "自殺", "自傷", "リストカット", "殺したい"];
+    if (深刻.some(w => 文.includes(w))) return { 本文: "つらい気持ちが大きいようです。ここでは答えず、話せる人につないでください。よりそいホットライン 0120-279-338（24時間・無料）、いのちSOS 0120-061-338 があります。", 出所: "専門窓口" };
+    const 質問 = s.質問[文] ? 文 : ((s.キーワード.find(([語]) => 語.some(w => 文.includes(w))) || [])[1] || null);
+    const 候補 = 質問 ? s.質問[質問][相手] : s.困った時[相手];
+    return { 本文: 候補[Math.floor(乱() * 候補.length)].split("{状況}").join(状況), 出所: 質問 || "自由" };
+  }
+  function 節目の文(設定, キー, 状況, 乱 = Math.random) {
+    const e = 設定.通信.節目[キー]; if (!e) throw new Error("その節目はありません");
+    return { 送り手: e.送り手, 本文: e.文[Math.floor(乱() * e.文.length)].split("{状況}").join(状況), 出所: キー, 名: e.名 };
+  }
+
+  // ---------- 実験室（化学反応。Mac 版の X1 と同じ選び方。スマホ版は AI につながらないので、理由と実験の文は、ひな形） ----------
+  function 実験の材料(データ, ニュース = [], 記録 = [], 使わない = []) {
+    const 封 = new Set(使わない.map(x => x.出どころ + ":" + x.id)), 最後 = {}, 出 = [];
+    for (const e of 記録) for (const m of e.材料) { const k = m.出どころ + ":" + m.id, d = e.日付.slice(0, 10); if (!最後[k] || 最後[k] < d) 最後[k] = d; }
+    const 足す = (出どころ, id, 題, 楽しい = false) => { 題 = (題 || "").trim().replace(/\n/g, " ").slice(0, 40); if (題 && !封.has(出どころ + ":" + id)) 出.push({ 出どころ, id, 題, 最後に使った日: 最後[出どころ + ":" + id] || null, 楽しい }); };
+    for (const r of 生きている(データ.warehouse_items || [])) if (["保管中", "種"].includes(r.処理)) 足す("倉庫", r.id, r.内容);
+    for (const r of 生きている(データ.deposits || [])) 足す("預け", r.id, r.本文);
+    for (const r of ニュース) if (r.反応 === "気になる") 足す("気になる", r.id, r.見出し);
+    for (const t of 生きている(データ.tasks).filter(t => !t.倉庫)) 足す("タスク", t.id, t.内容, t.楽しさの印 === "楽しい");
+    return 出;
+  }
+  const 二文字 = 題 => { const s = new Set(); for (let i = 0; i < 題.length - 1; i++) { const x = 題.slice(i, i + 2); if (x.trim().length === 2 && !/^\d+$/.test(x)) s.add(x); } return s; };
+  function 実験の組(材料, 今 = new Date(), 乱 = Math.random, 除く = [], 組の数 = 3) {
+    const 除 = new Set(除く.map(x => x.出どころ + ":" + x.id)), 古さ = m => m.最後に使った日 ? Math.min(30, 日数の差(今, m.最後に使った日)) : 30, 候補 = [];
+    for (let i = 0; i < 材料.length; i++) for (let j = i + 1; j < 材料.length; j++) {
+      const a = 材料[i], b = 材料[j];
+      if (a.題 === b.題 || 除.has(a.出どころ + ":" + a.id) || 除.has(b.出どころ + ":" + b.id)) continue;
+      const A = 二文字(a.題), 共通 = [...二文字(b.題)].filter(x => A.has(x)).sort();
+      候補.push([共通.length * 3 + (古さ(a) + 古さ(b)) / 10 + (a.楽しい ? 1 : 0) + (b.楽しい ? 1 : 0) + 乱() * 0.5, a, b, 共通]);
+    }
+    候補.sort((x, y) => y[0] - x[0]);
+    const 使った = new Set(), 組 = [];
+    for (const [, a, b, 共通] of 候補) {
+      const ka = a.出どころ + ":" + a.id, kb = b.出どころ + ":" + b.id; if (使った.has(ka) || 使った.has(kb)) continue;
+      使った.add(ka); 使った.add(kb);
+      組.push({ 材料: [a, b], 共通の語: 共通, 理由: 共通.length ? "「" + a.題 + "」と「" + b.題 + "」には、共通の言葉（" + 共通.slice(0, 3).join("、") + "）があるので、組にしました。" : "「" + a.題 + "」と「" + b.題 + "」は、最近あまり触れていない物なので、組にしました。" });
+      if (組.length >= 組の数) break;
+    }
+    return 組;
+  }
+  function 実験の文(設定, 題A, 題B) {
+    const 長さ = ((設定 && 設定.実験室) || {}).長さ分 || 15;
+    const A = (題A || "").trim(), B = (題B || "").trim();
+    if (!A || !B) throw new Error("言葉が空です"); if (A.length > 40 || B.length > 40) throw new Error("言葉が長すぎます（40文字まで）"); if (A === B) throw new Error("2つは、違う言葉にしてください");
+    return "「" + A + "」と「" + B + "」を掛け合わせて、" + 長さ + "分で試します。「" + A + "」を、「" + B + "」の目で見直して、気づいたことを1つだけ書き出してください。";
+  }
+
   // ---------- メモ（Mac 版の M1 と同じ決まり。期限なし。タスクとは別） ----------
   const メモ設定 = 設定 => Object.assign({ 種類: ["欲しい物", "やりたい事", "その他"], 本文の最大文字数: 500 }, (設定 && 設定.メモ) || {});
   function メモを検査する(設定, 本文, 種類) {
@@ -619,7 +771,8 @@
   }
 
   const 公開 = { 締切を整える, 点数, 順位表, 提案, 理由を作る, 残りの言い方, 今日の様子, 新しいid, 更新印, 削除印, 生きている, タスクを足す, タスクを直す, タスクを消す,
-                 カレンダー設定, 望む予定, 予定の差, 空き時間, 今の空き, 倍率の表, 使う見積もり, 相場を足す, 分解の案, 分解して足す, 提案を記録, 反応を記録, あとでを戻す, 五分を始める, 五分を終える, 状態を記録, 使える状態, 預ける, メモ設定, メモを足す, メモを直す, メモを消す, 締切の一覧, 月の表, 日付文字, 時刻文字,
+                 倉庫設定, 倉庫の候補, 倉庫に積む, 倉庫に入れる, 窓口, 倉庫で処理, 灰, 種, 灰を戻す, 棚に置く, 棚, 棚に答える, 翌朝の体を答える, 棚から外す,
+                 通信の状況, 通信の返事, 節目の文, 実験の材料, 実験の組, 実験の文, カレンダー設定, 望む予定, 予定の差, 空き時間, 今の空き, 倍率の表, 使う見積もり, 相場を足す, 分解の案, 分解して足す, 提案を記録, 反応を記録, あとでを戻す, 五分を始める, 五分を終える, 状態を記録, 使える状態, 預ける, メモ設定, メモを足す, メモを直す, メモを消す, 締切の一覧, 月の表, 日付文字, 時刻文字,
                  一覧を混ぜる, 価値観を混ぜる, 古い削除を消す, 同期を組み立てる, 同期ファイルを確かめる, 同期を実行,
                  点数を計算, 疲れを計算, 出来事を書く, 開く, 睡眠を答える, 達成する, 会話の点, 生活の状態, 顔の名前, 放置日数の合計,
                  箱の中身, 預けを開く, 預けに反応する, 封じる, 封をやめる, 今の封, 今日の封印, 封を済にする, 次の問い, 価値観に答える, 価値観を今日はやめる, ニュースを並べる };

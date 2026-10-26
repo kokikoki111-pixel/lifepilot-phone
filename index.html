@@ -30,20 +30,21 @@ async function 設定を読む() {
   try { const s = localStorage.getItem("lifepilot_settings"); if (s) { 設定 = JSON.parse(s); return; } } catch (e) {}
   設定 = await (await fetch("初期設定.json")).json();            // 個人のデータは入っていない、初めの設定
 }
-async function エルピーの設定を補う() {          // 古い設定（エルピーの項目がない）の時は、初めの設定から足す
-  if (設定.エルピー) return;
-  try { 設定.エルピー = (await (await fetch("初期設定.json")).json()).エルピー; } catch (e) {}
+async function エルピーの設定を補う() {          // 古い設定（新しい項目がない）の時は、初めの設定から、足りない項目だけ足す
+  const 要る = ["エルピー", "倉庫", "相場帳", "分解", "カレンダー", "通信", "実験室"];
+  if (要る.every(k => 設定[k])) return;
+  try { const 初 = await (await fetch("初期設定.json")).json(); for (const k of 要る) if (!設定[k] && 初[k]) 設定[k] = 初[k]; } catch (e) {}
 }
 const 言 = k => (設定.整備室.表示の言葉 || {})[k] || k;
 function 出す(文, エラー) { const e = $("通知"); if (e) { e.className = エラー ? "エラー" : "完了"; e.textContent = 文; } }
 const 安全 = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // ================= 画面の切り替え =================
-const 画面一覧 = [["提案", "今なにする？"], ["エルピー", "エルピー"], ["タスク", "タスク"], ["カレンダー", "カレンダー"], ["メモ", "メモ"], ["預ける", "預ける"], ["夜", "明日何やる？"], ["ニュース", "ニュース"], ["状態", "体と気分"], ["同期", "同期"]];
+const 画面一覧 = [["提案", "今なにする？"], ["エルピー", "エルピー"], ["タスク", "タスク"], ["カレンダー", "カレンダー"], ["メモ", "メモ"], ["預ける", "預ける"], ["夜", "明日何やる？"], ["ニュース", "ニュース"], ["倉庫", "倉庫"], ["通信", "通信"], ["実験室", "実験室"], ["状態", "体と気分"], ["同期", "同期"]];
 function 描く() {
   clearInterval(時計);
-  $("タブ").innerHTML = 画面一覧.map(([k, 名]) => `<button class="${k === 画面 ? "今" : ""}" onclick="移る('${k}')">${名}</button>`).join("");
-  ({ 提案: 提案画面, エルピー: エルピー画面, タスク: () => タスク画面(), カレンダー: カレンダー画面, メモ: メモ画面, 預ける: 預ける画面, 夜: 夜画面, ニュース: ニュース画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
+  $("タブ").innerHTML = 画面一覧.map(([k, 名]) => `<button class="${k === 画面 ? "今" : ""}" onclick="移る('${k}')">${名}${k === "通信" && 未読の数() ? "（" + 未読の数() + "）" : ""}</button>`).join("");
+  ({ 提案: 提案画面, エルピー: エルピー画面, タスク: () => タスク画面(), カレンダー: カレンダー画面, メモ: メモ画面, 預ける: 預ける画面, 夜: 夜画面, ニュース: ニュース画面, 倉庫: 倉庫画面, 通信: 通信画面, 実験室: 実験室画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
 }
 function 移る(k) { 画面 = k; 描く(); }
 
@@ -123,7 +124,7 @@ function タスク画面(直す = null) {
     行.querySelector(".小").textContent = `${名[x.種類] || x.種類}・重要度${x.重要度}・${x.楽しさの印}・${x.見積もり分}分` + (x.締切 ? "・" + x.締切.replace("T", " ") : "") + (x.間隔日 ? "・" + x.間隔日 + "日おき" : "") + (x.画面を使う === false ? "・画面なし" : "");
     const [達, 分, 直, 消] = 行.querySelectorAll("button");
     分.onclick = () => 分解を出す(x);
-    達.onclick = () => { if (confirm("「" + x.内容 + "」を達成にしますか？（+5点。締切のタスクは、一覧から外れます）")) { L.達成する(データ, x.id); 保存(); タスク画面(); setTimeout(() => { 出す("達成にしました（気分の点数 " + L.生活の状態(データ, 設定).点数 + "）"); 時間を聞く(x); }, 0); } };
+    達.onclick = () => { if (confirm("「" + x.内容 + "」を達成にしますか？（+5点。締切のタスクは、一覧から外れます）")) { L.達成する(データ, x.id); 保存(); 節目を送る("達成"); タスク画面(); setTimeout(() => { 出す("達成にしました（気分の点数 " + L.生活の状態(データ, 設定).点数 + "）"); 時間を聞く(x); }, 0); } };
     直.onclick = () => { タスク画面(x.id); window.scrollTo(0, 0); };
     消.onclick = () => { if (confirm("「" + x.内容 + "」" + 言("消す前の確認"))) { L.タスクを消す(データ, x.id); 保存(); タスク画面(); setTimeout(() => 出す(言("消した後")), 0); } };
     $("一覧").appendChild(行);
@@ -393,7 +394,108 @@ function 五分を終える(結果, 開始, タスク, 続け中 = false) {
   clearInterval(時計);
   const 実績分 = Math.round((Date.now() - 開始) / 6000) / 10;      // 実際にかかった分（0.1分単位）
   try { L.五分を終える(データ, 設定, 五分の記録, 結果, new Date(), 実績分); } catch (e) {} 保存();
+  if (結果 !== "中断") 節目を送る("五分");
   $("本体").innerHTML = `<h1>記録しました</h1><div class="カード"><p class="完了">${結果 === "中断" ? "中断しました。それでも、触れたことは記録しました。" : "「" + 結果 + "」を記録しました。"}</p><p class="小">${差の文(実績分, タスク)}</p><button class="押す 濃" onclick="移る('提案')">もう一度、提案を出す</button></div>`;
+}
+
+// ================= 倉庫（柱C）と寝かせ棚。記録は同期の対象（Mac と同じ） =================
+function 倉庫画面() {
+  const s = L.倉庫設定(設定), 窓 = L.窓口(データ, 設定), 候補 = L.倉庫の候補(データ, 設定), 棚 = L.棚(データ);
+  $("本体").innerHTML = `<h1>倉庫</h1><p class="小">放置したこと・やりたかったことを、罪悪感なく整理する場所です。開かなくてもかまいません。積んだ物は、タスク一覧・提案・点数の計算から外れます。</p><p id="通知"></p>
+    <h2>週に1回の窓口（${窓.件数}件が保管中）</h2><div id="窓"></div>
+    <h2>倉庫に積む候補（${候補.length}件）</h2><p class="小">${s.動かない日数}日以上、触っていないタスクです（締切がまだ先の物は、出しません）。</p><div class="カード" id="候補"></div>
+    <h2>倉庫に入れる（タスク以外）</h2><div class="カード"><select id="入口">${s.入口.map(x => `<option>${安全(x)}</option>`).join("")}</select><input id="入れる" placeholder="1行で（例：いつか行きたい店）"><button class="押す 濃" id="入れるボタン">倉庫に入れる</button></div>
+    <h2>寝かせ棚（欲しい物は、買う前に置いておく）</h2><div class="カード"><input id="欲しい" placeholder="欲しい物を1行で"><button class="押す 濃" id="置く">棚に置く</button><div id="棚"></div></div>
+    <h2>灰と種</h2><div class="カード" id="灰"></div>`;
+  const 再 = 文 => { 保存(); 倉庫画面(); setTimeout(() => 出す(文), 0); }, 試す = f => { try { f(); } catch (e) { 出す(e.message, true); } };
+  $("窓").innerHTML = 窓.出す.map(r => `<div class="カード"><b>${安全(r.内容)}</b>（${安全(r.入口)}）<div class="小">${安全(r.一言)}</div>
+    <div class="行ボタン"><button data-k="${r.id}" data-x="買取">買取</button><button data-k="${r.id}" data-x="解体">解体</button><button data-k="${r.id}" data-x="焼却">焼却</button><button data-k="${r.id}" data-x="種">種</button></div></div>`).join("") || '<p class="小">いま、窓口に出す物はありません。</p>';
+  $("窓").querySelectorAll("[data-k]").forEach(b => b.onclick = () => {
+    const id = +b.dataset.k, x = b.dataset.x;
+    if (x === "解体") { const 文 = prompt("使える部品を、1つずつ「、」で区切って書いてください（例：資料を1つ探す、最初の1段落を書く）", ""); if (文 === null) return; return 試す(() => { L.倉庫で処理(データ, 設定, id, "解体", null, 文.split(/[、,\n]/)); 再("解体しました。部品を、新しいタスクにしました。"); }); }
+    if (x === "焼却") { const 理由 = prompt("焼却します。理由は、書かなくてもかまいません（任意）。", ""); if (理由 === null) return; return 試す(() => { L.倉庫で処理(データ, 設定, id, "焼却", 理由); 再("焼却しました。灰として残ります（元に戻せます）。"); }); }
+    試す(() => { L.倉庫で処理(データ, 設定, id, x); 再(x === "買取" ? "買取しました（タスクに戻りました）。" : "種として残しました。"); });
+  });
+  $("候補").innerHTML = 候補.map(t => `<div class="タスク行"><span>${安全(t.内容)}<br><span class="小">${t.触っていない日数}日 触っていません</span></span><button class="押す" data-p="${t.id}">積む</button></div>`).join("") || '<p class="小">いまは、ありません。</p>';
+  $("候補").querySelectorAll("[data-p]").forEach(b => b.onclick = () => 試す(() => { L.倉庫に積む(データ, +b.dataset.p); 再("倉庫に積みました（タスク一覧と提案から外れます）。"); }));
+  $("入れるボタン").onclick = () => 試す(() => { L.倉庫に入れる(データ, 設定, $("入れる").value, $("入口").value); 再("倉庫に入れました。"); });
+  $("置く").onclick = () => 試す(() => { L.棚に置く(データ, 設定, $("欲しい").value); 再("棚に置きました。" + s.寝かせ日数 + "日後に、聞きます。"); });
+  $("棚").innerHTML = 棚.聞く.map(r => `<div class="カード"><b>${安全(r.物)}</b><div class="小">置いてから日がたちました。まだ欲しいですか？</div><div class="行ボタン">${["買う", "やめる", "もう少し置く"].map(a => `<button data-w="${r.id}" data-a="${a}">${a}</button>`).join("")}</div></div>`).join("")
+    + 棚.寝かせ中.map(r => `<div class="タスク行"><span>${安全(r.物)}<br><span class="小">${安全(r.次に聞く日)} に聞きます</span></span><button class="押す" data-d="${r.id}">外す</button></div>`).join("")
+    + 棚.済み.slice().reverse().slice(0, 10).map(r => `<div class="小">${安全(r.物)}：${安全(r.答え)}（${安全(r.答えた日)}）${r.答え === "買う" && r.買った翌朝の体 == null ? ` <button class="押す" data-b="${r.id}">翌朝の体</button>` : ""}</div>`).join("");
+  $("棚").querySelectorAll("[data-w]").forEach(b => b.onclick = () => 試す(() => { L.棚に答える(データ, 設定, +b.dataset.w, b.dataset.a); 再("記録しました。"); }));
+  $("棚").querySelectorAll("[data-d]").forEach(b => b.onclick = () => 試す(() => { L.棚から外す(データ, +b.dataset.d); 再("棚から外しました。"); }));
+  $("棚").querySelectorAll("[data-b]").forEach(b => b.onclick = () => { const v = prompt("買った翌朝の体は、何%でしたか？（0〜100）", ""); if (v === null) return; 試す(() => { L.翌朝の体を答える(データ, +b.dataset.b, Number(v)); 再("記録しました。"); }); });
+  $("灰").innerHTML = L.灰(データ).map(r => `<div class="タスク行"><span>${安全(r.内容)}<br><span class="小">灰 ${安全(r.処理した日)}${r.焼却の理由 ? "／" + 安全(r.焼却の理由) : ""}</span></span><button class="押す" data-r="${r.id}">戻す</button></div>`).join("")
+    + L.種(データ).map(r => `<div class="タスク行"><span>${安全(r.内容)}<br><span class="小">種 ${安全(r.処理した日)}</span></span><button class="押す" data-r="${r.id}">戻す</button></div>`).join("") || '<p class="小">まだ、ありません。</p>';
+  $("灰").querySelectorAll("[data-r]").forEach(b => b.onclick = () => 試す(() => { L.灰を戻す(データ, +b.dataset.r); 再("倉庫に戻しました。"); }));
+}
+
+// ================= 通信（リラ・パーシー）。スマホは AI につながらないので、決めた文。記録は、この端末の中だけ =================
+const 通信を読む = () => { try { return JSON.parse(localStorage.getItem("lifepilot_comm") || "[]"); } catch (e) { return []; } };
+const 通信を書く = 一覧 => { try { localStorage.setItem("lifepilot_comm", JSON.stringify(一覧.slice(-300))); } catch (e) {} };
+let 通信の相手 = "リラ"; const 最後の節目 = {};
+function 節目を送る(キー) {
+  if (!設定.通信) return;
+  try {
+    const e = L.節目の文(設定, キー, L.通信の状況(データ, 設定)), 今 = Date.now();
+    if (最後の節目[e.送り手] && 今 - 最後の節目[e.送り手] < (設定.通信.重ね禁止秒 || 5) * 1000) return;
+    最後の節目[e.送り手] = 今;
+    const 一覧 = 通信を読む(); 一覧.push({ 日時: L.時刻文字(new Date()), 送り手: e.送り手, 本文: e.本文, 出所: キー, 既読: 画面 === "通信" }); 通信を書く(一覧);
+  } catch (x) {}
+}
+function 起動の節目(報告) {
+  const 今日 = L.日付文字(new Date());
+  if (!通信を読む().some(r => r.出所 === "朝" && r.日時.startsWith(今日))) 節目を送る("朝");
+  if (報告 && 報告.締切切れ) 節目を送る("締切切れ");             // 朝＝リラ、締切切れ＝パーシー（送り手が違うので、重ならない）
+}
+const 未読の数 = () => 通信を読む().filter(r => !r.既読 && r.送り手 !== "あなた").length;
+function 通信画面() {
+  if (!設定.通信) { $("本体").innerHTML = '<h1>通信</h1><p class="小">通信の設定がありません。Mac と同期すると、使えます。</p>'; return; }
+  const 一覧 = 通信を読む(); 一覧.forEach(r => r.既読 = true); 通信を書く(一覧);
+  const 人 = Object.keys(設定.通信.人), 質問 = Object.keys(設定.通信.質問);
+  $("本体").innerHTML = `<h1>通信</h1><p class="小">リラとパーシーから来るのは、タスクの節目と、あなたが聞いた時だけです。点数は動きません。スマホでは、決めた文で返します（AIの返事は、Macの通信画面で）。</p>
+    <div class="選択" id="相手">${人.map(n => `<button data-n="${n}" class="${n === 通信の相手 ? "選ばれ" : ""}">${n}</button>`).join("")}</div>
+    <div class="カード" id="会話" style="max-height:50vh;overflow-y:auto">${一覧.slice(-60).map(r => r.送り手 === "あなた" ? `<div style="text-align:right;margin:8px 0"><span style="display:inline-block;background:#eef3f8;border-radius:10px;padding:6px 10px">${安全(r.本文)}</span></div>` : `<div style="margin:8px 0"><div class="小">${安全(r.送り手)}　${安全(r.日時.slice(5, 16))}</div><span style="display:inline-block;background:#f4f1ea;border-radius:10px;padding:6px 10px">${安全(r.本文)}</span></div>`).join("") || '<p class="小">まだ、通信はありません。下のボタンから聞いてみてください。</p>'}</div>
+    <div class="選択" id="質問">${質問.map(q => `<button>${安全(q)}</button>`).join("")}</div>
+    <input id="聞く" placeholder="聞いてみる（例：今日は何からやる？）" maxlength="300"><button class="押す 濃" id="送る">送る</button><p id="通知"></p>`;
+  $("会話").scrollTop = $("会話").scrollHeight;
+  $("相手").querySelectorAll("[data-n]").forEach(b => b.onclick = () => { 通信の相手 = b.dataset.n; 通信画面(); });
+  const 送る = 文 => { try { const r = L.通信の返事(設定, 通信の相手, 文, L.通信の状況(データ, 設定)), 今 = L.時刻文字(new Date()), 一覧 = 通信を読む();
+      一覧.push({ 日時: 今, 送り手: "あなた", 本文: 文.trim(), 出所: "自分", 既読: true }, { 日時: 今, 送り手: 通信の相手, 本文: r.本文, 出所: r.出所, 既読: true }); 通信を書く(一覧); 通信画面(); } catch (e) { 出す(e.message, true); } };
+  $("質問").querySelectorAll("button").forEach(b => b.onclick = () => 送る(b.textContent));
+  $("送る").onclick = () => 送る($("聞く").value);
+}
+
+// ================= 実験室（柱D・化学反応）。スマホは AI につながらないので、理由と実験の文はひな形。記録は、この端末の中だけ =================
+const 実験を読む = () => { try { return JSON.parse(localStorage.getItem("lifepilot_lab") || "[]"); } catch (e) { return []; } };
+const 実験を書く = 一覧 => { try { localStorage.setItem("lifepilot_lab", JSON.stringify(一覧)); } catch (e) {} };
+const 使わない一覧 = () => { try { return JSON.parse(localStorage.getItem("lifepilot_lab_blocked") || "[]"); } catch (e) { return []; } };
+let 前の組 = [], 今の実験 = null;
+function 実験の材料() { let ニュース = []; try { ニュース = JSON.parse(localStorage.getItem("lifepilot_news") || "[]"); } catch (e) {} return L.実験の材料(データ, ニュース, 実験を読む(), 使わない一覧()); }
+function 実験室画面() {
+  const 長さ = (設定.実験室 || {}).長さ分 || 15, 記録 = 実験を読む();
+  $("本体").innerHTML = `<h1>実験室</h1><p class="小">気になる物を、${長さ}分で小さく試す場所です。材料は、倉庫の物・預けた言葉・ニュースの「気になる」・タスクの題。結果は聞きません。持ち帰るのは1つだけ（書かなくてもよい）。</p><p id="通知"></p><div id="実験"></div>
+    <h2>化学反応（組を引く）</h2><div class="行ボタン"><button id="引く">組を引く</button><button id="別">別の組を引く</button></div><div id="組"></div>
+    <h2>自分の言葉の化学反応</h2><div class="カード"><input id="A" placeholder="言葉A" list="材料一覧"><input id="B" placeholder="言葉B" list="材料一覧"><datalist id="材料一覧">${実験の材料().map(m => `<option value="${安全(m.題)}">`).join("")}</datalist><button class="押す 濃" id="作る">実験を作る</button></div>
+    <h2>これまでの実験</h2><div class="カード">${記録.slice().reverse().slice(0, 20).map(r => `<div class="タスク行"><span>${安全(r.材料.map(m => m.題).join(" × "))}<br><span class="小">${安全(r.日付.slice(0, 16))}${r.持ち帰り ? "　持ち帰り：" + 安全(r.持ち帰り) : ""}</span></span></div>`).join("") || '<p class="小">まだ、ありません。</p>'}</div>`;
+  const 組を出す = 別 => {
+    前の組 = L.実験の組(実験の材料(), new Date(), Math.random, 別 ? 前の組.flatMap(p => p.材料) : []);
+    $("組").innerHTML = 前の組.map((p, i) => `<div class="カード"><b>${安全(p.材料[0].題)} × ${安全(p.材料[1].題)}</b><div class="小">${安全(p.材料[0].出どころ)}／${安全(p.材料[1].出どころ)}</div><div>${安全(p.理由)}</div><button class="押す" data-i="${i}">この組で実験する</button></div>`).join("") || '<p class="小">材料が足りません（2つ以上あると出ます）。下の「自分の言葉」なら、すぐ試せます。</p>';
+    $("組").querySelectorAll("[data-i]").forEach(b => b.onclick = () => { const p = 前の組[+b.dataset.i]; 始める("AIの化学反応", p.材料, p.理由); });
+  };
+  $("引く").onclick = () => 組を出す(false); $("別").onclick = () => 組を出す(true);
+  $("作る").onclick = () => 始める("自分の言葉の化学反応", [{ 題: $("A").value.trim() }, { 題: $("B").value.trim() }], "");
+  const 始める = (型, 材料, 理由) => {
+    let 文; try { 文 = L.実験の文(設定, 材料[0].題, 材料[1].題); } catch (e) { return 出す(e.message, true); }
+    今の実験 = { 日付: L.時刻文字(new Date()), 型, 材料: 材料.map(m => ({ 出どころ: m.出どころ || "自分", id: m.id ?? null, 題: m.題 })), 実験の内容: 文, 理由, 開始: Date.now() };
+    const 終わり = Date.now() + 長さ * 60000; clearInterval(時計);
+    $("実験").innerHTML = `<div class="カード"><b>${安全(材料.map(m => m.題).join(" × "))}</b><p>${安全(文)}</p><div class="時間" id="時間"></div><input id="持ち帰り" placeholder="持ち帰る1つ（書かなくてもよい）" maxlength="200"><button class="押す 濃" id="終える">終える（途中でもよい）</button></div>`;
+    window.scrollTo(0, 0);
+    const 描 = () => { const 残 = Math.max(0, Math.round((終わり - Date.now()) / 1000)); if ($("時間")) $("時間").textContent = Math.floor(残 / 60) + ":" + String(残 % 60).padStart(2, "0"); if (!残) clearInterval(時計); };
+    描(); 時計 = setInterval(描, 500);
+    $("終える").onclick = () => { clearInterval(時計); const 一覧 = 実験を読む(); 一覧.push(Object.assign({}, 今の実験, { 持ち帰り: $("持ち帰り").value.trim().slice(0, 200) || null, 所要分: Math.round((Date.now() - 今の実験.開始) / 6000) / 10 })); 実験を書く(一覧); 今の実験 = null; 実験室画面(); setTimeout(() => 出す("記録しました。おつかれさまでした。"), 0); };
+  };
 }
 
 // ================= 同期（Google ドライブ） =================
@@ -427,5 +529,5 @@ async function 同期する() {
 }
 
 // ================= 開始 =================
-(async () => { 読み込む(); await 設定を読む(); await エルピーの設定を補う(); try { L.開く(データ); 保存(); } catch (e) {} if (!画面一覧.some(x => x[0] === 画面)) 画面 = "提案"; 描く(); })().catch(e => { document.body.innerHTML = "<p style='padding:20px'>読み込めませんでした：" + e.message + "</p>"; });
+(async () => { 読み込む(); await 設定を読む(); await エルピーの設定を補う(); try { 起動の節目(L.開く(データ)); 保存(); } catch (e) {} if (!画面一覧.some(x => x[0] === 画面)) 画面 = "提案"; 描く(); })().catch(e => { document.body.innerHTML = "<p style='padding:20px'>読み込めませんでした：" + e.message + "</p>"; });
 </script></body></html>
