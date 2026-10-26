@@ -44,7 +44,7 @@
   }
   const 生きている = 一覧 => 一覧.filter(r => !r.削除);
   function 順位表(データ, 設定, 体, 気分低, 今) {
-    const 結果 = 生きている(データ.tasks).map(t => [t, 点数(t, 設定, 体, 気分低, 今)]);
+    const 結果 = 生きている(データ.tasks).filter(t => !t.倉庫).map(t => [t, 点数(t, 設定, 体, 気分低, 今)]);
     return 結果.sort((a, b) => b[1].合計 - a[1].合計);          // 並べ替えは安定（同点は、元の順）
   }
 
@@ -80,6 +80,32 @@
     return { あとで, やらない, 最後に出した };
   }
   const 丸め = x => Math.round(x * 1e6) / 1e6;
+  // ---------- 相場帳（Mac 版の R1_相場帳.py と同じ決まり） ----------
+  const 相場設定 = 設定 => Object.assign({ 選択肢分: [5, 15, 30, 60, 90], 補正: true, 最低件数: 5, 最近の件数: 20, 倍率の下限: 0.5, 倍率の上限: 3 }, (設定 && 設定.相場帳) || {});
+  function 倍率の表(記録, 設定) {
+    const s = 相場設定(設定), 並び = (記録 || []).filter(r => !r.削除).sort((a, b) => (a.日時 < b.日時 ? -1 : a.日時 > b.日時 ? 1 : 0) || (String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0)), 表 = {};
+    for (const 種 of new Set(並び.map(r => r.種類))) {
+      const 使う = 並び.filter(r => r.種類 === 種).slice(-s.最近の件数);
+      const 平均 = 使う.reduce((a, r) => a + r.実際分 / r.見積もり分, 0) / 使う.length;
+      表[種] = { 件数: 使う.length, 倍率: Math.floor(Math.min(s.倍率の上限, Math.max(s.倍率の下限, 平均)) * 100 + 0.5) / 100 };
+    }
+    return 表;
+  }
+  function 使う見積もり(タスク, 表, 設定) {          // [提案に使う分, 理由の文 または null]
+    const s = 相場設定(設定), 元 = タスク.見積もり分, x = 表[タスク.種類];
+    if (!s.補正 || !x || x.件数 < s.最低件数) return [元, null];
+    const 分 = Math.max(1, Math.floor(元 * x.倍率 + 0.5));
+    if (分 === 元) return [元, null];
+    const 名 = (設定.柱A.タスクの種類.find(k => k.キー === タスク.種類) || {}).名前 || タスク.種類;
+    return [分, "あなたの「" + 名 + "」は、見積もりの" + x.倍率 + "倍かかる傾向（" + x.件数 + "件）なので、" + 元 + "分を" + 分 + "分として扱いました。"];
+  }
+  function 相場を足す(データ, 設定, タスクid, 種類, 見積もり分, 実際分, 元 = "達成", 今 = new Date()) {
+    if (!設定.柱A.タスクの種類.some(k => k.キー === 種類)) throw new Error("種類が正しくありません");
+    for (const [名, v, 上] of [["見積もり分", 見積もり分, 100000], ["実際分", 実際分, 1440]]) if (typeof v !== "number" || !(v > 0 && v <= 上)) throw new Error(名 + "は、0より大きい数字です（" + 上 + "以下）");
+    データ.duration_log = データ.duration_log || [];
+    const r = 更新印({ id: 新しいid(データ.duration_log), 日時: 時刻文字(今), タスクid, 種類, 見積もり分, 実際分: Math.round(実際分 * 10) / 10, 元 }, 今);
+    データ.duration_log.push(r); return r;
+  }
   function 提案(データ, 設定, 空き分, 体 = 100, 気分低 = false, 今 = new Date(), 電池 = null) {
     const 絞り = 設定.柱A.提案の絞り, 選択肢 = 設定.柱A.空き時間の選択肢, 最後の選択肢 = 選択肢[選択肢.length - 1];
     const 疲れている = (絞り.体が低い時は重い候補を外す && 体 <= 絞り.重い候補を外す体の基準) || (絞り.気分が低い時は重い候補を外す && 気分低);
@@ -87,16 +113,17 @@
     const 並び = 順位表(データ, 設定, 体, 気分低, 今).filter(([t]) => !(やらない.has(t.id) || あとで.has(t.id)));
     並び.sort((a, b) => (丸め(b[1].合計) - 丸め(a[1].合計)) || ((最後に出した[a[0].id] || "") < (最後に出した[b[0].id] || "") ? -1 : (最後に出した[a[0].id] || "") > (最後に出した[b[0].id] || "") ? 1 : 0));
     const 電池が少ない = 電池 !== null && 電池 <= 絞り.電池が少ない基準;
+    const 倍率 = 倍率の表(データ.duration_log, 設定);
     const 候補 = [];
     for (const [t, 点] of 並び) {
       if (電池が少ない && (t.画面を使う !== false)) continue;
-      if (空き分 !== 最後の選択肢 && t.見積もり分 > 空き分) continue;
+      if (空き分 !== 最後の選択肢 && 使う見積もり(t, 倍率, 設定)[0] > 空き分) continue;
       if (疲れている && t.楽しさの印 === "重い") continue;
       候補.push([t, 点]);
     }
     if (!候補.length) return { 候補なし: true, 文: 電池が少ない ? "電池が少ないので、画面を使わない物だけを探しましたが、ありません。" : "今は出せる物がありません。", あとでの件数: あとで.size };
     const [t, 点] = 候補[0];
-    const 結果 = { 候補なし: false, 一手: t, 点数: 点.合計, 点, 理由: 理由を作る(t, 点, 設定, 今), あとでの件数: あとで.size, 電池が少ない };
+    const 結果 = { 候補なし: false, 一手: t, 点数: 点.合計, 点, 理由: 理由を作る(t, 点, 設定, 今) + (使う見積もり(t, 倍率, 設定)[1] ? " " + 使う見積もり(t, 倍率, 設定)[1] : ""), あとでの件数: あとで.size, 電池が少ない };
     if (候補.length > 1) 結果.代替 = 候補[1][0]; else 結果.代替の文 = 設定.柱A.理由の文.代替なし;
     return 結果;
   }
@@ -162,7 +189,9 @@
     if (!r) throw new Error("その提案はありません");
     if (r.反応 !== null) throw new Error("この提案には、もう反応しています");
     r.反応 = 反応; r.理由の分類 = (反応 === "今日はやらない" || 反応 === "今やらない") ? 理由 : null; r.自由記述 = (自由記述 || "").trim(); r.反応の日時 = 時刻文字(今);
-    更新印(r, 今); return r;
+    更新印(r, 今);
+    if ((反応 === "今日はやらない" || 反応 === "今やらない") && 理由 === "気分じゃない") 出来事を書く(データ, "気分じゃない", 今);
+    return r;
   }
   function あとでを戻す(データ, 今 = new Date()) {
     const 今日 = 日付文字(今), 戻した = new Set();
@@ -177,13 +206,22 @@
     t.最後に触った日 = 日付文字(今); 更新印(t, 今);
     const r = 更新印({ id: 新しいid(データ.focus_log), タスクid, 開始: 時刻文字(今), 終了: null, 結果: null }, 今); データ.focus_log.push(r); return r.id;
   }
-  function 五分を終える(データ, 設定, 記録id, 結果, 今 = new Date()) {
+  function 五分を終える(データ, 設定, 記録id, 結果, 今 = new Date(), 実績分 = null) {
     const 選択肢 = 設定.柱A["5分だけ終わりの選択肢"].concat(["中断"]);
     if (!選択肢.includes(結果)) throw new Error("結果は " + 選択肢.join("・") + " のどれかです");
     const r = データ.focus_log.find(x => x.id === 記録id);
     if (!r) throw new Error("その記録はありません");
     if (r.結果 !== null) throw new Error("もう終わっています");
+    if (実績分 !== null) {
+      if (typeof 実績分 !== "number" || !(実績分 >= 0 && 実績分 <= 1440)) throw new Error("実績分は、0〜1440 の数字です");
+      r.実績分 = Math.round(実績分 * 10) / 10;
+    }
     r.結果 = 結果; r.終了 = 時刻文字(今); 更新印(r, 今);
+    if (結果 === "続ける" && r.実績分) {         // 「続ける」で計り続けた時間は、実際の所要。相場帳に入れる（5分だけの分は入れない）
+      const t = データ.tasks.find(x => x.id === r.タスクid);
+      if (t) 相場を足す(データ, 設定, t.id, t.種類, t.見積もり分, r.実績分, "続ける", 今);
+    }
+    if (結果 !== "中断") 出来事を書く(データ, "五分", 今, { 理由: "タスクを5分やった" });
   }
 
   // ---------- 体・気分・電池 ----------
@@ -218,8 +256,318 @@
   }
 
 
+  // ---------- タスク分解（Mac 版の K1_分解.py と同じ決まり。ひな形・AIなし。元のタスクは残す） ----------
+  const 分解設定 = 設定 => Object.assign({ 小さい分: 15, 準備分: 5, 見直し分: 5, 最大件数: 20, 準備の文: "{内容}：道具・資料を出す", 最初の文: "{内容}：最初の5分だけ触る", 本体の文: "{内容}：その{n}", 見直しの文: "{内容}：見直す" }, (設定 && 設定.分解) || {});
+  function 分解の案(タスク, 設定) {
+    const s = 分解設定(設定), 総 = タスク.見積もり分, 小 = s.小さい分;
+    if (総 <= 小) throw new Error("このタスクは、すでに " + 小 + "分以下です。分けなくて大丈夫です");
+    const 文 = (ひな形, n = "") => ひな形.split("{内容}").join(タスク.内容).split("{n}").join(String(n));
+    let 前, 後, 前の文;
+    if (総 >= s.準備分 + s.見直し分 + 小) { 前 = s.準備分; 後 = s.見直し分; 前の文 = 文(s.準備の文); } else { 前 = 5; 後 = 0; 前の文 = 文(s.最初の文); }
+    const 本体 = 総 - 前 - 後, n = Math.ceil(本体 / 小), 基 = Math.floor(本体 / n), 余 = 本体 % n;
+    const 手順 = [{ 内容: 前の文, 分: 前 }];
+    for (let i = 0; i < n; i++) 手順.push({ 内容: 文(s.本体の文, i + 1), 分: 基 + (i < 余 ? 1 : 0) });
+    if (後) 手順.push({ 内容: 文(s.見直しの文), 分: 後 });
+    if (手順.length > s.最大件数) throw new Error("手順が多すぎます（" + s.最大件数 + "件まで）。先に、もっと大きく2つに分けてください");
+    return 手順;
+  }
+  function 分解して足す(データ, 設定, タスクid, 手順, 今 = new Date()) {
+    const 元 = 生きている(データ.tasks).filter(t => !t.倉庫).find(t => t.id === タスクid);
+    if (!元) throw new Error("そのタスクはありません");
+    if (!Array.isArray(手順) || !手順.length) throw new Error("手順がありません");
+    if (手順.length > 分解設定(設定).最大件数) throw new Error("手順が多すぎます（" + 分解設定(設定).最大件数 + "件まで）");
+    const 中身 = 手順.map(p => ({ 内容: (p || {}).内容, 種類: "その他", 重要度: 元.重要度, 楽しさの印: 元.楽しさの印, 見積もり分: (p || {}).分, 画面を使う: 元.画面を使う !== false }));
+    中身.forEach(x => タスクを検査して整える(x, 設定));            // 先に全部検査する（半端に足さない）
+    return 中身.map(x => タスクを足す(データ, 設定, x, 今).id);
+  }
+
+  // ---------- Googleカレンダー連携（詳細仕様16）：書く予定を組み立てる・既存との差を出す・空き時間を数える ----------
+  // 通信そのもの（ログイン・API）は calendar.js。ここは、通信しない関数だけ（試験できる）。書くのは「［LP］」を頭に付けた自分の予定だけ。
+  const カレンダー設定 = 設定 => Object.assign({ 接頭: "［LP］", 朝の時: 8, 朝の5分の通知分: 10, 前日の夜の時: 21, 当日の朝の時: 8, 予定の長さ分: 15, 活動の始まり: 8, 活動の終わり: 22, 空きの最小分: 15, 反映の先読み日数: 365 }, (設定 && 設定.カレンダー) || {});
+  const 地方の時刻 = d => 日付文字(d) + "T" + 二桁(d.getHours()) + ":" + 二桁(d.getMinutes()) + ":00";
+  const 簡易ハッシュ = 文 => { let h = 5381; for (let i = 0; i < 文.length; i++) h = ((h * 33) ^ 文.charCodeAt(i)) >>> 0; return h.toString(36); };
+  function 予定を作る(キー, 題, 開始, 長さ分, 通知の分, 設定, 時間帯) {
+    const 終わり = new Date(開始.getTime() + 長さ分 * 60000), 通知 = [...new Set(通知の分)].filter(m => m > 0 && m <= 40320).sort((a, b) => b - a);
+    const 本体 = { summary: 題, start: { dateTime: 地方の時刻(開始), timeZone: 時間帯 }, end: { dateTime: 地方の時刻(終わり), timeZone: 時間帯 },
+                   reminders: { useDefault: false, overrides: 通知.map(m => ({ method: "popup", minutes: m })) } };
+    本体.extendedProperties = { private: { lifepilot: "1", lpkey: キー, h: 簡易ハッシュ(JSON.stringify(本体)) } };
+    return { キー, 本体 };
+  }
+  function 望む予定(データ, 設定, 今 = new Date(), 時間帯 = "Asia/Tokyo") {
+    const s = カレンダー設定(設定), 結果 = [], 先 = new Date(今.getTime() + s.反映の先読み日数 * 86400000);
+    for (const t of 生きている(データ.tasks).filter(t => !t.倉庫)) {            // 課題の締切：前日の夜と、当日の朝に通知
+      if (t.種類 !== "締切" || !t.締切) continue;
+      let 切れ; try { 切れ = 締切の日時(t.締切); } catch (e) { continue; }
+      if (切れ <= 今 || 切れ > 先) continue;
+      const 前夜 = new Date(切れ.getFullYear(), 切れ.getMonth(), 切れ.getDate() - 1, s.前日の夜の時, 0), 朝 = new Date(切れ.getFullYear(), 切れ.getMonth(), 切れ.getDate(), s.当日の朝の時, 0);
+      const 通知 = [Math.round((切れ - 前夜) / 60000)]; if (朝 < 切れ) 通知.push(Math.round((切れ - 朝) / 60000));
+      結果.push(予定を作る("締切-" + t.id, s.接頭 + "課題：" + t.内容, 切れ, s.予定の長さ分, 通知, 設定, 時間帯));
+    }
+    const 封 = 今の封(データ);                                                    // 朝の5分：封をしたタスクを、対象日の朝の予定にする
+    if (封) {
+      const t = 生きている(データ.tasks).filter(t => !t.倉庫).find(t => t.id === 封.タスクid), m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(封.対象日 || "");
+      if (t && m) {
+        const 開始 = new Date(+m[1], +m[2] - 1, +m[3], s.朝の時, 0);
+        if (開始 > 今) 結果.push(予定を作る("朝-" + 封.id, s.接頭 + "朝の5分：" + t.内容, 開始, 5, [s.朝の5分の通知分], 設定, 時間帯));
+      }
+    }
+    return 結果;
+  }
+  // 既存のLP予定（Googleから読んだ物）と、望む予定の差。過去の予定は、直さない・消さない
+  function 予定の差(望む, 既存, 今 = new Date()) {
+    const 持つ = new Map(); for (const e of 既存) { const p = (e.extendedProperties || {}).private || {}; if (p.lifepilot === "1" && p.lpkey) 持つ.set(p.lpkey, e); }
+    const 作る = [], 直す = [], 消す = [], 望むキー = new Set(望む.map(x => x.キー));
+    for (const x of 望む) { const e = 持つ.get(x.キー); if (!e) 作る.push(x); else if (e.extendedProperties.private.h !== x.本体.extendedProperties.private.h) 直す.push({ id: e.id, 予定: x }); }
+    for (const [キー, e] of 持つ) { if (望むキー.has(キー)) continue; const 始 = new Date((e.start || {}).dateTime || (e.start || {}).date || 0); if (始 >= 今) 消す.push({ id: e.id, キー }); }
+    return { 作る, 直す, 消す };
+  }
+  // 空き時間：ある日の、活動時間（8〜22時）から、予定のある時間を引いた残り。終日の予定は、数えない
+  function 空き時間(予定一覧, 日付, 設定) {
+    const s = カレンダー設定(設定), m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(日付);
+    const 始 = new Date(+m[1], +m[2] - 1, +m[3], s.活動の始まり, 0).getTime(), 終 = new Date(+m[1], +m[2] - 1, +m[3], s.活動の終わり, 0).getTime();
+    const 忙しい = 予定一覧.filter(e => (e.start || {}).dateTime && (e.end || {}).dateTime && e.status !== "cancelled" && e.transparency !== "transparent")
+      .map(e => [new Date(e.start.dateTime).getTime(), new Date(e.end.dateTime).getTime()]).filter(([a, b]) => b > 始 && a < 終).sort((a, b) => a[0] - b[0]);
+    const 空き = []; let 位置 = 始;
+    for (const [a, b] of 忙しい) { if (a > 位置) 空き.push([位置, Math.min(a, 終)]); 位置 = Math.max(位置, b); }
+    if (位置 < 終) 空き.push([位置, 終]);
+    const 時 = ms => 二桁(new Date(ms).getHours()) + ":" + 二桁(new Date(ms).getMinutes());
+    return 空き.map(([a, b]) => ({ 開始: 時(a), 終了: 時(b), 分: Math.round((b - a) / 60000) })).filter(x => x.分 >= s.空きの最小分);
+  }
+  // いまから次の予定までの分（予定が無ければ、活動の終わりまで）→「今なにする？」の空き時間の選択肢に当てはめる
+  function 今の空き(予定一覧, 今, 設定) {
+    const s = カレンダー設定(設定), 終 = new Date(今.getFullYear(), 今.getMonth(), 今.getDate(), s.活動の終わり, 0).getTime();
+    let 次 = 終;
+    for (const e of 予定一覧) { if (!(e.start || {}).dateTime || e.status === "cancelled" || e.transparency === "transparent") continue; const a = new Date(e.start.dateTime).getTime(), b = new Date((e.end || e.start).dateTime).getTime(); if (a <= 今.getTime() && b > 今.getTime()) return { 分: 0, 選択: null }; if (a > 今.getTime() && a < 次) 次 = a; }
+    const 分 = Math.max(0, Math.floor((次 - 今.getTime()) / 60000)), 選択肢 = 設定.柱A.空き時間の選択肢, 合う = 選択肢.filter(x => x <= 分);
+    return { 分, 選択: 合う.length ? 合う[合う.length - 1] : null };
+  }
+
+  // ---------- メモ（Mac 版の M1 と同じ決まり。期限なし。タスクとは別） ----------
+  const メモ設定 = 設定 => Object.assign({ 種類: ["欲しい物", "やりたい事", "その他"], 本文の最大文字数: 500 }, (設定 && 設定.メモ) || {});
+  function メモを検査する(設定, 本文, 種類) {
+    const s = メモ設定(設定); 本文 = (本文 || "").trim();
+    if (!本文) throw new Error("メモが空です");
+    if (本文.length > s.本文の最大文字数) throw new Error("長すぎます（" + s.本文の最大文字数 + "文字まで）");
+    if (!s.種類.includes(種類)) throw new Error("種類は " + s.種類.join("・") + " のどれかです");
+    return 本文;
+  }
+  function メモを足す(データ, 設定, 本文, 種類 = "その他", 今 = new Date()) {
+    本文 = メモを検査する(設定, 本文, 種類); データ.memos = データ.memos || [];
+    const メモ = 更新印({ id: 新しいid(データ.memos), 日付: 時刻文字(今), 種類, 本文 }, 今); データ.memos.push(メモ); return メモ;
+  }
+  function メモを直す(データ, 設定, 番号, 本文, 種類, 今 = new Date()) {
+    本文 = メモを検査する(設定, 本文, 種類);
+    const r = (データ.memos || []).find(x => x.id === 番号 && !x.削除); if (!r) throw new Error("そのメモはありません");
+    r.本文 = 本文; r.種類 = 種類; 更新印(r, 今); return r;
+  }
+  function メモを消す(データ, 番号, 今 = new Date()) {
+    const r = (データ.memos || []).find(x => x.id === 番号 && !x.削除); if (!r) throw new Error("そのメモはありません");
+    削除印(r, 今); return r;
+  }
+
+  // ---------- カレンダー（締切型タスクを、月の表に並べる。Mac の画面も、この関数を使う） ----------
+  function 締切の一覧(タスク一覧, 今 = new Date()) {
+    const 今日 = 日付文字(今), 結果 = [];
+    for (const t of 生きている(タスク一覧).filter(t => !t.倉庫)) {
+      if (t.種類 !== "締切" || !t.締切) continue;
+      const 日 = t.締切.slice(0, 10), 時刻 = (t.締切.slice(11, 16) || "");
+      結果.push({ タスク: t, 日付: 日, 時刻, 残り日: -日数の差(今, 日), 期限切れ: (() => { try { return 締切の日時(t.締切) < 今; } catch (e) { return 日 < 今日; } })() });
+    }
+    return 結果.sort((a, b) => (a.日付 + a.時刻).localeCompare(b.日付 + b.時刻));
+  }
+  function 月の表(年, 月, タスク一覧, 今 = new Date()) {         // 月は 1〜12。週は日曜はじまり
+    const 今日 = 日付文字(今), 一覧 = 締切の一覧(タスク一覧, 今), 先頭 = new Date(年, 月 - 1, 1), 末 = new Date(年, 月, 0).getDate();
+    const 日々 = [];
+    for (let i = 0; i < 先頭.getDay(); i++) 日々.push(null);
+    for (let d = 1; d <= 末; d++) { const 日付 = 年 + "-" + 二桁(月) + "-" + 二桁(d); 日々.push({ 日付, 日: d, 今日: 日付 === 今日, 締切: 一覧.filter(x => x.日付 === 日付) }); }
+    while (日々.length % 7) 日々.push(null);
+    const 週 = []; for (let i = 0; i < 日々.length; i += 7) 週.push(日々.slice(i, i + 7));
+    return { 年, 月, 週 };
+  }
+
+  // ---------- 受け取り箱（Mac 版の D2 と同じ決まり） ----------
+  function 箱の中身(データ, 今 = new Date()) {
+    const 今日 = 日付文字(今);
+    return 生きている(データ.deposits).filter(r => r.返す日 && r.返す日 <= 今日 && r.反応 === null);
+  }
+  function 預けを開く(データ, 番号, 今 = new Date()) {
+    const 箱 = new Set(箱の中身(データ, 今).map(r => r.id)), r = データ.deposits.find(x => x.id === 番号 && !x.削除);
+    if (!r) throw new Error("その預けはありません");
+    if (!箱.has(番号)) throw new Error("その預けは、受け取り箱にありません");
+    if (r.受け取った日 === null) { r.受け取った日 = 日付文字(今); 更新印(r, 今); }
+    return r;
+  }
+  function 預けに反応する(データ, 設定, 番号, 反応, 新しい本文 = null, 返す選択 = "なし", 今 = new Date()) {
+    if (!["いまも同じ", "変わった", "消す"].includes(反応)) throw new Error("反応は、いまも同じ・変わった・消す のどれかです");
+    預けを開く(データ, 番号, 今);
+    let 新しい預け = null;
+    if (反応 === "変わった" && (新しい本文 || "").trim()) 新しい預け = 預ける(データ, 設定, 新しい本文, null, 返す選択, 今);   // 先に預け直す（失敗したら、元は変えない）
+    const r = データ.deposits.find(x => x.id === 番号);
+    if (反応 === "消す") 削除印(r, 今); else { r.反応 = 反応; 更新印(r, 今); }
+    return 新しい預け;
+  }
+
+  // ---------- 夜の封印（Mac 版の A6 と同じ決まり） ----------
+  function 封じる(データ, 設定, タスクid, 今 = new Date()) {
+    if (!生きている(データ.tasks).filter(t => !t.倉庫).some(t => t.id === タスクid)) throw new Error("そのタスクはありません");
+    const 境 = 設定.柱A.夜の封印.朝とみなす境の時, 対象 = new Date(今.getFullYear(), 今.getMonth(), 今.getDate() + (今.getHours() >= 境 ? 1 : 0));
+    for (const r of データ.seals) if (r.状態 === "封中") { r.状態 = "差し替え"; 更新印(r, 今); }
+    const r = 更新印({ id: 新しいid(データ.seals), 封じた日時: 時刻文字(今), 対象日: 日付文字(対象), タスクid, 状態: "封中" }, 今); データ.seals.push(r); return r;
+  }
+  function 封をやめる(データ, 今 = new Date()) { let n = 0; for (const r of データ.seals) if (r.状態 === "封中") { r.状態 = "やめた"; 更新印(r, 今); n++; } return n; }
+  const 今の封 = データ => データ.seals.find(r => r.状態 === "封中") || null;
+  function 今日の封印(データ, 今 = new Date()) {
+    const r = 今の封(データ); if (!r || r.対象日 !== 日付文字(今)) return null;
+    const タスク = 生きている(データ.tasks).filter(t => !t.倉庫).find(t => t.id === r.タスクid); return タスク ? Object.assign({}, r, { タスク }) : null;
+  }
+  function 封を済にする(データ, 封id, 結果, 今 = new Date()) {
+    if (!["始めた", "今日はやらない"].includes(結果)) throw new Error("結果は、始めた・今日はやらない のどちらかです");
+    const r = データ.seals.find(x => x.id === 封id && x.状態 === "封中"); if (!r) throw new Error("その封はありません");
+    r.状態 = 結果; 更新印(r, 今);
+  }
+
+  // ---------- 価値観の問い（Mac 版の C1 と同じ決まり） ----------
+  function 次の問い(データ, 設定, 今 = new Date()) {
+    const 今日 = 日付文字(今), v = データ.values || { 答え: {}, 今日はやめた: {} };
+    return (設定.土台2.価値観の問い || []).find(q => !(q.キー in v.答え) && v.今日はやめた[q.キー] !== 今日) || null;
+  }
+  function 価値観に答える(データ, 設定, キー, 選択 = null, 一言 = "", 今 = new Date()) {
+    const q = (設定.土台2.価値観の問い || []).find(x => x.キー === キー); if (!q) throw new Error("その問いはありません");
+    if (選択 !== null && !q.選択肢.includes(選択)) throw new Error("選択肢にない答えです");
+    一言 = (一言 || "").trim(); if (選択 === null && !一言) throw new Error("選択肢を選ぶか、一言を書いてください");
+    データ.values = データ.values || { 答え: {}, 今日はやめた: {} };
+    データ.values.答え[キー] = 更新印({ 選択, 一言, 更新日: 日付文字(今) }, 今);
+  }
+  function 価値観を今日はやめる(データ, 設定, キー, 今 = new Date()) {
+    if (!(設定.土台2.価値観の問い || []).some(x => x.キー === キー)) throw new Error("その問いはありません");
+    データ.values = データ.values || { 答え: {}, 今日はやめた: {} }; データ.values.今日はやめた[キー] = 日付文字(今);
+  }
+
+  // ---------- ニュース（スマホは見るだけ。Mac が集めた見出しを、同期で受け取る） ----------
+  function ニュースを並べる(ニュース, 設定) {
+    const 語 = ((設定.柱E || {}).興味の語 || []).filter(w => w), 件 = (設定.柱E || {}).表示件数 || 50;
+    const 一覧 = (ニュース || []).filter(r => r.反応 !== "いらない").map(r => { const 合う = 語.filter(w => r.見出し.includes(w)); return Object.assign({}, r, { 合う語: 合う, 理由: 合う.length ? "『" + 合う.join("』『") + "』を含むため" : null }); });
+    const 新しい順 = (a, b) => ((b.掲載日時 || b.取得日時) > (a.掲載日時 || a.取得日時) ? 1 : (b.掲載日時 || b.取得日時) < (a.掲載日時 || a.取得日時) ? -1 : 0);
+    return 一覧.filter(r => r.合う語.length).sort(新しい順).concat(一覧.filter(r => !r.合う語.length).sort(新しい順)).slice(0, 件);
+  }
+
+  // ---------- 生活の点数と睡眠（Mac 版の L1_生活の点数.py と同じ決まり） ----------
+  // 点数は、出来事の記録（life_events）から、いつでも計算し直せる。疲れは、睡眠の記録（sleep_logs）から決まる。
+  const 種類一覧 = ["ログイン", "達成", "五分", "気分じゃない", "締切切れ", "会話", "放置"];
+  const 四捨五入 = x => Math.floor(x + 0.5), 一桁丸め = v => 四捨五入(v * 10) / 10;
+  const 新しい今日 = () => ({ 達成: 0, 五分: 0, 気分じゃない: 0, 会話: 0, ログイン: false });
+  const 生きた一覧 = 一覧 => (一覧 || []).filter(r => !r.削除);
+  const 文字順 = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  function 顔の名前(点, 段階) { let 名 = 段階[0][1]; for (const [下, n] of 段階) if (点 >= 下) 名 = n; return 名; }
+  function 点数を計算(出来事, 設定, 今 = new Date()) {
+    const e = 設定.エルピー, g = e.生活, p = e.点数, 今日 = 日付文字(今);
+    const 並び = 出来事.slice().sort((a, b) => 文字順(a.日付, b.日付) || 文字順(a.日時 || "", b.日時 || "") || 文字順(String(a.id), String(b.id)));
+    if (!並び.length) return { 点数: 0, 履歴: [], 今日: 新しい今日() };
+    const 放置 = {}, 日別 = {};
+    for (const r of 並び) { if (r.種 === "放置") 放置[r.日付] = r; else (日別[r.日付] = 日別[r.日付] || []).push(r); }
+    const 日の値 = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return Date.UTC(+m[1], +m[2] - 1, +m[3]); };
+    const 日文字 = ms => { const d = new Date(ms); return d.getUTCFullYear() + "-" + 二桁(d.getUTCMonth() + 1) + "-" + 二桁(d.getUTCDate()); };
+    let 点 = 0, 履歴 = [], 数 = 新しい今日();
+    const 加える = (日, 差, 理由) => { const 前 = 点; 点 = Math.max(p.下限, Math.min(p.上限, 点 + 差)); 履歴.push({ 日付: 日, 理由, 点: 一桁丸め(点 - 前) }); };
+    const 末 = Math.max(日の値(並び[並び.length - 1].日付), 日の値(今日));
+    for (let ms = 日の値(並び[0].日付); ms <= 末; ms += 86400000) {
+      const 日 = 日文字(ms); 数 = 新しい今日();
+      for (const r of 日別[日] || []) {
+        const k = r.種;
+        if (k === "ログイン") { if (数.ログイン) 加える(日, 0, "ログイン（今日はもう加点済み）"); else { 数.ログイン = true; 加える(日, g.ログイン, "ログイン"); } }
+        else if (k === "達成" || k === "五分") {
+          const 名 = k === "達成" ? "タスク達成" : "タスクを5分やった", 実 = Math.min(g[k].点, g[k].上限 - 数[k]);
+          if (実 <= 0) 加える(日, 0, 名 + "（今日の上限に達したので、加点なし）"); else { 数[k] += 実; 加える(日, 実, 名); }
+        }
+        else if (k === "気分じゃない") { if (数.気分じゃない >= g.気分じゃない.回数) 加える(日, 0, "「気分じゃない」（今日の回数の上限なので、減点なし）"); else { 数.気分じゃない++; 加える(日, g.気分じゃない.点, "「気分じゃない」を選んだ"); } }
+        else if (k === "締切切れ") 加える(日, g.締切切れ, r.理由 || "締切切れ");
+        else if (k === "会話") {
+          const 差 = Math.max(-p.一回の最大, Math.min(p.一回の最大, r.点 || 0)), 残 = g.会話の上限 - 数.会話;
+          const 実 = (差 > 0 ? 1 : 差 < 0 ? -1 : 0) * Math.min(Math.abs(差), Math.max(0, 残)); 数.会話 += Math.abs(実);
+          if (差 !== 0) 加える(日, 実, 実 === 差 ? (r.理由 || "会話") : (r.理由 || "会話") + "（今日の会話の上限で、一部だけ）");
+        }
+      }
+      if (日 < 今日) {
+        加える(日, -点 * g.戻る割合, "1日の終わり：0へ戻る（" + 四捨五入(g.戻る割合 * 100) + "%）");
+        if (放置[日] && (放置[日].日数 || 0) > 0) {
+          const n = 放置[日].日数, 減 = Math.max(g.放置.上限, g.放置.点 * n);
+          加える(日, 減, "放置（放置日数の合計 " + n + "日" + (減 > g.放置.点 * n ? "、1日の上限で止めた" : "") + "）");
+        }
+      }
+    }
+    return { 点数: 一桁丸め(点), 履歴: 履歴.reverse().slice(0, 30), 今日: 数 };
+  }
+  function 疲れを計算(睡眠, 設定, 今 = new Date()) {
+    const s = 設定.エルピー.睡眠, n = s.日数, 表 = {}, 時間 = [];
+    for (const r of 睡眠) 表[r.日付] = r.時間;
+    for (let i = 0; i < n; i++) { const v = 表[日付文字(new Date(今.getFullYear(), 今.getMonth(), 今.getDate() - i))]; if (typeof v === "number") 時間.push(v); }
+    if (!時間.length) return { 疲れ: 0, 入力日数: 0, 時間: [], 合計: null, 説明: "睡眠：まだ入力なし（疲れは0のまま）" };
+    const 合計 = 時間.reduce((a, b) => a + b, 0) / 時間.length * n;
+    const 疲れ = 四捨五入(Math.max(0, Math.min(100, (s.疲れ0 - 合計) / (s.疲れ0 - s.疲れ100) * 100)));
+    return { 疲れ, 入力日数: 時間.length, 時間, 合計: 一桁丸め(合計), 説明: "直近" + n + "日の睡眠：" + 時間.length + "日分の入力（" + 時間.map(v => v + "h").join("、") + "）→ " + n + "日合計 " + 一桁丸め(合計).toFixed(1) + "時間 → 疲れ " + 疲れ + (時間.length < n ? "（入れ忘れは平均で補った）" : "") };
+  }
+  // 出来事を1件、足す。番号を決めたい物（ログイン・締切切れ・放置）は、同じ番号が既にあれば、足さない
+  function 出来事を書く(データ, 種, 今 = new Date(), { 点 = null, 理由 = null, 日数 = null, 番号 = null } = {}) {
+    if (!種類一覧.includes(種)) throw new Error("出来事の種類は " + 種類一覧.join("・") + " のどれかです");
+    データ.life_events = データ.life_events || [];
+    if (番号 !== null && データ.life_events.some(r => r.id === 番号)) return null;
+    const r = { id: 番号 !== null ? 番号 : 新しいid(データ.life_events), 日時: 時刻文字(今), 日付: 日付文字(今), 種 };
+    if (点 !== null) r.点 = 点; if (日数 !== null) r.日数 = 日数; if (理由) r.理由 = 理由;
+    データ.life_events.push(更新印(r, 今)); return r;
+  }
+  function 放置日数の合計(日, タスク一覧) {
+    let 合計 = 0;
+    for (const t of タスク一覧) { if (t.倉庫 || (t.作成日 || "") > 日) continue; 合計 += Math.max(0, Math.round((日の値(日) - 日の値(t.最後に触った日)) / 86400000)); }
+    return 合計;
+  }
+  const 日の値 = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s); return Date.UTC(+m[1], +m[2] - 1, +m[3]); };
+  // 起動の手続き（何度呼んでも同じ）：ログインを記録 → 昨日までの放置を数える → 締切が切れたタスクを数える
+  function 開く(データ, 今 = new Date()) {
+    const 今日 = 日付文字(今), 報告 = { 放置: 0, 締切切れ: 0 };
+    出来事を書く(データ, "ログイン", 今, { 番号: "ログイン-" + 今日 });
+    const 開始 = 生きた一覧(データ.life_events).filter(r => r.種 === "ログイン").map(r => r.日付).sort()[0];
+    const タスク = 生きた一覧(データ.tasks);
+    for (const t of タスク) {
+      if (t.種類 === "締切" && !t.倉庫) {
+        const 切れ = 締切の日時(t.締切);
+        if (切れ <= 今 && 日付文字(切れ) >= 開始 && 出来事を書く(データ, "締切切れ", 切れ, { 番号: "締切切れ-" + t.id, 理由: "締切切れ：" + t.内容 })) 報告.締切切れ++;
+      }
+    }
+    for (let ms = 日の値(開始); ; ms += 86400000) {
+      const d = new Date(ms), 日 = d.getUTCFullYear() + "-" + 二桁(d.getUTCMonth() + 1) + "-" + 二桁(d.getUTCDate());
+      if (日 >= 今日) break;
+      const 終わり = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59);
+      if (出来事を書く(データ, "放置", 終わり, { 日数: 放置日数の合計(日, タスク), 番号: "放置-" + 日 })) 報告.放置++;
+    }
+    return 報告;
+  }
+  // 今日の分（昨夜の睡眠）を記録する。時間が null なら「わからない」（入力なし扱い）。同じ日に答え直せる
+  function 睡眠を答える(データ, 時間, 今 = new Date()) {
+    if (時間 !== null && (typeof 時間 !== "number" || !(時間 >= 0 && 時間 <= 24))) throw new Error("睡眠時間は、0〜24 の数字か、「わからない」です");
+    データ.sleep_logs = データ.sleep_logs || [];
+    const 番号 = "睡眠-" + 日付文字(今), 既 = データ.sleep_logs.find(r => r.id === 番号);
+    if (既) { 既.時間 = 時間; delete 既.削除; 更新印(既, 今); } else データ.sleep_logs.push(更新印({ id: 番号, 日付: 日付文字(今), 時間 }, 今));
+  }
+  function 達成する(データ, タスクid, 今 = new Date()) {
+    const t = データ.tasks.find(x => x.id === タスクid && !x.削除);
+    if (!t) throw new Error("そのタスクはありません");
+    t.最後に触った日 = 日付文字(今);
+    if (t.種類 === "締切") 削除印(t, 今); else 更新印(t, 今);
+    出来事を書く(データ, "達成", 今, { 理由: "達成：" + t.内容 }); return t;
+  }
+  function 会話の点(文, 言葉) {
+    let 合計 = 0; const 理由 = [];
+    for (const [語一覧, 点] of 言葉) for (const w of 語一覧) if (文.includes(w)) { 合計 += 点; 理由.push("「" + w + "」" + (点 > 0 ? "+" : "") + 点); }
+    return [合計, 理由];
+  }
+  function 生活の状態(データ, 設定, 今 = new Date()) {
+    const 点 = 点数を計算(生きた一覧(データ.life_events), 設定, 今), 睡 = 生きた一覧(データ.sleep_logs), 疲 = 疲れを計算(睡, 設定, 今), 今日の答え = 睡.filter(r => r.日付 === 日付文字(今));
+    return { 点数: 点.点数, 顔: 顔の名前(点.点数, 設定.エルピー.段階), 疲れ: 疲.疲れ, 疲れの説明: 疲.説明, 履歴: 点.履歴, 今日: 点.今日,
+             睡眠の質問: !今日の答え.length, 今日の睡眠: 今日の答え.length ? 今日の答え[0].時間 : null };
+  }
+
   // ---------- 同期（突き合わせ。Mac 版の H1_突き合わせ.py と同じ決まり） ----------
-  const 形式の版 = 1, 混ぜる一覧名 = ["tasks", "deposits", "state_logs", "seals", "suggestion_log", "focus_log"];
+  const 形式の版 = 1, 混ぜる一覧名 = ["tasks", "deposits", "state_logs", "seals", "suggestion_log", "focus_log", "memos", "life_events", "sleep_logs", "warehouse_items", "wishlist", "duration_log"];
   const 整列 = v => Array.isArray(v) ? v.map(整列) : (v && typeof v === "object") ? Object.keys(v).sort().reduce((o, k) => (o[k] = 整列(v[k]), o), {}) : v;
   const 同じ内容 = (a, b) => JSON.stringify(整列(a)) === JSON.stringify(整列(b));
   const 新しい方 = (自分, 相手) => ((相手.更新日時 || "") > (自分.更新日時 || "") ? 相手 : 自分);
@@ -271,7 +619,9 @@
   }
 
   const 公開 = { 締切を整える, 点数, 順位表, 提案, 理由を作る, 残りの言い方, 今日の様子, 新しいid, 更新印, 削除印, 生きている, タスクを足す, タスクを直す, タスクを消す,
-                 提案を記録, 反応を記録, あとでを戻す, 五分を始める, 五分を終える, 状態を記録, 使える状態, 預ける, 日付文字, 時刻文字,
-                 一覧を混ぜる, 価値観を混ぜる, 古い削除を消す, 同期を組み立てる, 同期ファイルを確かめる, 同期を実行 };
+                 カレンダー設定, 望む予定, 予定の差, 空き時間, 今の空き, 倍率の表, 使う見積もり, 相場を足す, 分解の案, 分解して足す, 提案を記録, 反応を記録, あとでを戻す, 五分を始める, 五分を終える, 状態を記録, 使える状態, 預ける, メモ設定, メモを足す, メモを直す, メモを消す, 締切の一覧, 月の表, 日付文字, 時刻文字,
+                 一覧を混ぜる, 価値観を混ぜる, 古い削除を消す, 同期を組み立てる, 同期ファイルを確かめる, 同期を実行,
+                 点数を計算, 疲れを計算, 出来事を書く, 開く, 睡眠を答える, 達成する, 会話の点, 生活の状態, 顔の名前, 放置日数の合計,
+                 箱の中身, 預けを開く, 預けに反応する, 封じる, 封をやめる, 今の封, 今日の封印, 封を済にする, 次の問い, 価値観に答える, 価値観を今日はやめる, ニュースを並べる };
   if (typeof module !== "undefined" && module.exports) module.exports = 公開; else root.LifePilot = 公開;
 })(typeof self !== "undefined" ? self : this);

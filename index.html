@@ -6,7 +6,7 @@
 *{box-sizing:border-box} body{font-family:-apple-system,"Hiragino Sans",sans-serif;margin:0;background:var(--bg);color:var(--text);padding-bottom:84px}
 main{max-width:640px;margin:0 auto;padding:16px 16px 0} h1{font-size:19px;margin:6px 0 10px} h2{font-size:15px;margin:18px 0 6px}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;border:none;background:none;padding:12px 2px;font-size:12px;color:var(--sub)} nav button.今{color:var(--text);font-weight:bold;border-top:3px solid var(--accent);margin-top:-1px}
+nav{overflow-x:auto} nav button{flex:1 0 auto;min-width:72px;border:none;background:none;padding:12px 2px;font-size:12px;color:var(--sub)} nav button.今{color:var(--text);font-weight:bold;border-top:3px solid var(--accent);margin-top:-1px}
 .カード{border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-top:10px;background:var(--card)} .一手{font-size:21px;font-weight:bold;margin:0 0 6px}
 button.押す,.行ボタン button{padding:10px 16px;font-size:15px;border:1px solid #888;border-radius:8px;background:#fff;margin:4px 6px 4px 0} button.濃{background:var(--accent);color:#fff;border-color:var(--accent)}
 input,select,textarea{width:100%;padding:9px;font-size:16px;border:1px solid #aaa;border-radius:8px;background:#fff;margin-top:3px} textarea{height:100px} label{display:block;margin-top:12px;font-size:13px;color:var(--sub)}
@@ -17,11 +17,12 @@ input,select,textarea{width:100%;padding:9px;font-size:16px;border:1px solid #aa
 <nav id="タブ"></nav>
 <script src="core.js"></script>
 <script src="drive.js"></script>
+<script src="calendar.js"></script>
 <script>
 // ================= データ（スマホの中に、持つ） =================
 const L = LifePilot, $ = id => document.getElementById(id);
 const 既定のクライアントID = "207746409667-k82tseegkc8ufkm9jj1ddam877mmj8tn.apps.googleusercontent.com";   // Google の「名前札」。秘密ではない
-const 空データ = () => ({ tasks: [], deposits: [], state_logs: [], seals: [], suggestion_log: [], focus_log: [], values: { 答え: {}, 今日はやめた: {} } });
+const 空データ = () => ({ tasks: [], deposits: [], state_logs: [], seals: [], suggestion_log: [], focus_log: [], memos: [], life_events: [], sleep_logs: [], warehouse_items: [], wishlist: [], duration_log: [], values: { 答え: {}, 今日はやめた: {} } });
 let データ = 空データ(), 設定 = null, 画面 = (decodeURIComponent(location.hash.slice(1)) || "提案"), 時計 = null, 今の提案 = null, 今の空き = 0, 五分の記録 = null;
 function 保存() { try { localStorage.setItem("lifepilot_data", JSON.stringify(データ)); } catch (e) { 出す("保存できませんでした（保存先がいっぱいか、使えない設定です）", true); } }
 function 読み込む() { try { const s = localStorage.getItem("lifepilot_data"); if (s) データ = Object.assign(空データ(), JSON.parse(s)); } catch (e) { データ = 空データ(); } }
@@ -29,18 +30,46 @@ async function 設定を読む() {
   try { const s = localStorage.getItem("lifepilot_settings"); if (s) { 設定 = JSON.parse(s); return; } } catch (e) {}
   設定 = await (await fetch("初期設定.json")).json();            // 個人のデータは入っていない、初めの設定
 }
+async function エルピーの設定を補う() {          // 古い設定（エルピーの項目がない）の時は、初めの設定から足す
+  if (設定.エルピー) return;
+  try { 設定.エルピー = (await (await fetch("初期設定.json")).json()).エルピー; } catch (e) {}
+}
 const 言 = k => (設定.整備室.表示の言葉 || {})[k] || k;
 function 出す(文, エラー) { const e = $("通知"); if (e) { e.className = エラー ? "エラー" : "完了"; e.textContent = 文; } }
 const 安全 = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // ================= 画面の切り替え =================
-const 画面一覧 = [["提案", "今なにする？"], ["タスク", "タスク"], ["預ける", "預ける"], ["状態", "体と気分"], ["同期", "同期"]];
+const 画面一覧 = [["提案", "今なにする？"], ["エルピー", "エルピー"], ["タスク", "タスク"], ["カレンダー", "カレンダー"], ["メモ", "メモ"], ["預ける", "預ける"], ["夜", "明日何やる？"], ["ニュース", "ニュース"], ["状態", "体と気分"], ["同期", "同期"]];
 function 描く() {
   clearInterval(時計);
   $("タブ").innerHTML = 画面一覧.map(([k, 名]) => `<button class="${k === 画面 ? "今" : ""}" onclick="移る('${k}')">${名}</button>`).join("");
-  ({ 提案: 提案画面, タスク: タスク画面, 預ける: 預ける画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
+  ({ 提案: 提案画面, エルピー: エルピー画面, タスク: () => タスク画面(), カレンダー: カレンダー画面, メモ: メモ画面, 預ける: 預ける画面, 夜: 夜画面, ニュース: ニュース画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
 }
 function 移る(k) { 画面 = k; 描く(); }
+
+// ================= エルピー（生活の点数と、睡眠のアンケート） =================
+let 答え直し = false;
+function エルピー画面() {
+  L.開く(データ); 保存();                                     // ログイン・昨日までの放置・締切切れ（何度でも同じ）
+  const s = L.生活の状態(データ, 設定), e = 設定.エルピー, g = e.生活, t = s.今日;
+  const 位置 = (s.点数 - e.点数.下限) / (e.点数.上限 - e.点数.下限) * 100, 答え済み = !s.睡眠の質問;
+  const 選択 = [[3, "3時間以下"], [4, "4時間"], [5, "5時間"], [6, "6時間"], [7, "7時間"], [8, "8時間"], [9, "9時間"], [10, "10時間以上"]];
+  $("本体").innerHTML = `<h1>エルピー</h1>
+    <div class="カード"><div style="font-size:34px;font-weight:bold">${s.点数 >= 0 ? "+" : ""}${s.点数}　<span style="font-size:20px">${安全(s.顔)}</span></div>
+      <div style="position:relative;height:14px;border-radius:7px;background:linear-gradient(90deg,#C62E3A,#1F5FBF 50%,#F2C94C);margin:12px 0 4px"><i style="position:absolute;top:-4px;width:4px;height:22px;background:#222;border-radius:2px;left:calc(${位置}% - 2px)"></i></div>
+      <div class="小" style="display:flex;justify-content:space-between"><span>${e.点数.下限}</span><span>0</span><span>${e.点数.上限}</span></div>
+      <p class="小">気分の点数。達成・放置・締切・ログインなどで動き、日をまたいで積み上がります。</p></div>
+    <div class="カード"><b>疲れ ${s.疲れ}</b>
+      <div style="height:10px;border-radius:5px;background:#ddd;margin:8px 0"><div style="height:10px;border-radius:5px;background:#777;width:${s.疲れ}%"></div></div>
+      <div class="小">${安全(s.疲れの説明)}</div>
+      ${答え済み && !答え直し ? `<p>今日の睡眠：${s.今日の睡眠 === null ? "わからない" : s.今日の睡眠 + "時間"}　<button class="押す" id="直す">答え直す</button></p>` : `<p><b>昨夜は何時間ねましたか？</b></p><div class="選択" id="睡眠">${選択.map(([h, 名]) => `<button data-h="${h}">${名}</button>`).join("")}<button data-h="">わからない</button></div>`}</div>
+    <div class="カード"><b>今日の加点</b><div class="小">達成 ${t.達成}/${g.達成.上限}、5分 ${t.五分}/${g.五分.上限}、気分じゃない ${t.気分じゃない}/${g.気分じゃない.回数}回、会話 ${t.会話}/${g.会話の上限}、ログイン ${t.ログイン ? "済" : "未"}</div></div>
+    <h2>点数が動いた理由</h2><div class="カード" id="履歴"></div><span id="通知"></span>`;
+  $("履歴").innerHTML = s.履歴.length ? "" : '<span class="小">まだ、ありません</span>';
+  for (const r of s.履歴) { const d = document.createElement("div"); d.className = "小"; d.textContent = r.日付.slice(5) + "　" + (r.点 > 0 ? "+" : "") + r.点 + "　" + r.理由; $("履歴").appendChild(d); }
+  if ($("直す")) $("直す").onclick = () => { 答え直し = true; エルピー画面(); };
+  if ($("睡眠")) $("睡眠").onclick = ev => { const b = ev.target.closest("button"); if (!b) return; try { L.睡眠を答える(データ, b.dataset.h === "" ? null : Number(b.dataset.h)); 保存(); 答え直し = false; エルピー画面(); } catch (x) { 出す(x.message, true); } };
+}
 
 // ================= 状態（体・気分・電池） =================
 function 状態画面() {
@@ -61,7 +90,7 @@ function 状態画面() {
 
 // ================= タスク =================
 function タスク画面(直す = null) {
-  const 柱A = 設定.柱A, 生 = L.生きている(データ.tasks), t = 直す ? 生.find(x => x.id === 直す) : null;
+  const 柱A = 設定.柱A, 生 = L.生きている(データ.tasks).filter(x => !x.倉庫), t = 直す ? 生.find(x => x.id === 直す) : null;
   const 名 = Object.fromEntries(柱A.タスクの種類.map(x => [x.キー, x.名前]));
   $("本体").innerHTML = `<h1>タスク</h1><div class="カード"><b>${t ? "直す" : "足す"}</b>
     <label>内容</label><input id="内容" value="${安全(t?.内容)}">
@@ -76,6 +105,8 @@ function タスク画面(直す = null) {
     <h2>いまのタスク（${生.length}件）</h2><div class="カード" id="一覧"></div>`;
   const 切替 = () => { $("締切欄").style.display = $("種類").value === "締切" ? "" : "none"; $("間隔欄").style.display = $("種類").value === "継続" ? "" : "none"; };
   $("種類").onchange = 切替;
+  if (!t && 取っておく内容) { $("内容").value = 取っておく内容; 取っておく内容 = null; }
+  if (!t && 取っておく下書き) { $("種類").value = 取っておく下書き.種類; $("締切").value = 取っておく下書き.締切; 取っておく下書き = null; }
   if (t) { $("種類").value = t.種類; $("締切").value = t.締切 || ""; $("間隔日").value = t.間隔日 || ""; $("重要度").value = t.重要度; $("楽しさ").value = t.楽しさの印; $("画面").value = String(t.画面を使う !== false); $("見積もり").value = t.見積もり分; }
   切替();
   const 数 = id => $(id).value === "" ? null : Number($(id).value);
@@ -87,14 +118,88 @@ function タスク画面(直す = null) {
   $("一覧").innerHTML = 生.length ? "" : '<span class="小">まだ、ありません</span>';
   for (const x of 生) {
     const 行 = document.createElement("div"); 行.className = "タスク行";
-    行.innerHTML = `<div><b></b><br><span class="小"></span></div><div class="行ボタン"><button>${安全(言("直すボタン"))}</button><button>${安全(言("消すボタン"))}</button></div>`;
+    行.innerHTML = `<div><b></b><br><span class="小"></span></div><div class="行ボタン"><button>達成</button><button>分ける</button><button>${安全(言("直すボタン"))}</button><button>${安全(言("消すボタン"))}</button></div>`;
     行.querySelector("b").textContent = x.内容;
     行.querySelector(".小").textContent = `${名[x.種類] || x.種類}・重要度${x.重要度}・${x.楽しさの印}・${x.見積もり分}分` + (x.締切 ? "・" + x.締切.replace("T", " ") : "") + (x.間隔日 ? "・" + x.間隔日 + "日おき" : "") + (x.画面を使う === false ? "・画面なし" : "");
-    const [直, 消] = 行.querySelectorAll("button");
+    const [達, 分, 直, 消] = 行.querySelectorAll("button");
+    分.onclick = () => 分解を出す(x);
+    達.onclick = () => { if (confirm("「" + x.内容 + "」を達成にしますか？（+5点。締切のタスクは、一覧から外れます）")) { L.達成する(データ, x.id); 保存(); タスク画面(); setTimeout(() => { 出す("達成にしました（気分の点数 " + L.生活の状態(データ, 設定).点数 + "）"); 時間を聞く(x); }, 0); } };
     直.onclick = () => { タスク画面(x.id); window.scrollTo(0, 0); };
     消.onclick = () => { if (confirm("「" + x.内容 + "」" + 言("消す前の確認"))) { L.タスクを消す(データ, x.id); 保存(); タスク画面(); setTimeout(() => 出す(言("消した後")), 0); } };
     $("一覧").appendChild(行);
   }
+}
+
+// ================= カレンダー（締切型タスクの締切を、月の表に並べる） =================
+let 暦の年 = 0, 暦の月 = 0, 暦の日 = "";
+// ---- Googleカレンダー（読む・［LP］予定を書く）。予定の中身は、この端末の中だけに置く（同期ファイルには入れない）----
+const クライアントID = () => { try { return localStorage.getItem("lifepilot_clientid") || 既定のクライアントID; } catch (e) { return 既定のクライアントID; } };
+let G予定 = (() => { try { return JSON.parse(localStorage.getItem("lifepilot_gcal") || "null"); } catch (e) { return null; } })();      // { 取得: "…", 予定: [{id, summary, start, end, status, transparency, lp}] }
+const G保存 = () => { try { localStorage.setItem("lifepilot_gcal", JSON.stringify(G予定)); } catch (e) {} };
+async function Googleへつなぐ() {
+  const 状 = t => { const e = $("G状態"); if (e) e.textContent = t; };
+  try {
+    状("Google に問い合わせています…");
+    const C = LifePilotCalendar, 今 = new Date(), 設 = L.カレンダー設定(設定), トークン = await C.通行証(クライアントID());
+    const 読み始め = new Date(今.getFullYear(), 今.getMonth() - 1, 1), 読み終わり = new Date(今.getFullYear(), 今.getMonth() + 3, 1);
+    const 先 = new Date(今.getTime() + 設.反映の先読み日数 * 86400000);
+    const LP既存 = await C.読む(トークン, new Date(今.getTime() - 30 * 86400000), 先, true);                       // 自分が作った予定だけ（先読みの範囲ぜんぶ）
+    const 差 = L.予定の差(L.望む予定(データ, 設定, 今, Intl.DateTimeFormat().resolvedOptions().timeZone), LP既存, 今), 件 = 差.作る.length + 差.直す.length + 差.消す.length;
+    if (件 && confirm("Googleカレンダーに、［LP］の予定を反映します。\n作る " + 差.作る.length + "件・直す " + 差.直す.length + "件・消す " + 差.消す.length + "件（ふだんの予定は、触りません）。よろしいですか？")) {
+      const r = await C.反映する(トークン, 差); 状("反映しました（作った " + r.作った + "・直した " + r.直した + "・消した " + r.消した + "）。");
+    } else 状(件 ? "反映は、見送りました。" : "反映する物は、ありませんでした（すでに最新です）。");
+    const 予定 = await C.読む(トークン, 読み始め, 読み終わり);
+    G予定 = { 取得: L.時刻文字(new Date()), 予定: 予定.map(e => ({ id: e.id, summary: e.summary || "（題なし）", start: e.start, end: e.end, status: e.status, transparency: e.transparency, lp: ((e.extendedProperties || {}).private || {}).lifepilot === "1" })) };
+    G保存(); setTimeout(() => { カレンダー画面(); const e = $("G状態"); if (e) e.textContent = "読み込みました（" + G予定.予定.length + "件）。"; }, 0);
+  } catch (e) { 状(e.message); }
+}
+function Gの予定(日付) {
+  if (!G予定) return [];
+  return G予定.予定.filter(e => ((e.start || {}).dateTime || (e.start || {}).date || "").slice(0, 10) === 日付 || ((e.start || {}).date && (e.start.date <= 日付 && (e.end || {}).date > 日付)));
+}
+function カレンダー画面() {
+  if (!暦の年) { const 今 = new Date(); 暦の年 = 今.getFullYear(); 暦の月 = 今.getMonth() + 1; 暦の日 = L.日付文字(今); }
+  const 表 = L.月の表(暦の年, 暦の月, データ.tasks), 一覧 = L.締切の一覧(データ.tasks), 曜日 = ["日", "月", "火", "水", "木", "金", "土"];
+  const 行 = x => `<div class="タスク行"><span>${安全(x.タスク.内容)}</span><span class="小" ${x.期限切れ ? 'style="color:#b00020"' : ""}>${x.日付.slice(5).replace("-", "/")} ${x.時刻}（${x.期限切れ ? "期限切れ" : x.残り日 === 0 ? "今日" : "あと" + x.残り日 + "日"}）</span></div>`;
+  $("本体").innerHTML = `<h1>カレンダー</h1><p class="小">締切型のタスクの「締切」を、月の表に並べます。日付を押すと、その日の締切が、下に出ます。</p>
+    <div class="カード"><div style="display:flex;align-items:center;justify-content:space-between"><button class="押す" id="前" aria-label="前の月">◀</button><b>${暦の年}年${暦の月}月</b><button class="押す" id="次" aria-label="次の月">▶</button></div>
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:8px"><tr>${曜日.map(d => `<th style="font-size:11px;color:#777">${d}</th>`).join("")}</tr>${表.週.map(週 => "<tr>" + 週.map(c => !c ? '<td style="height:46px"></td>' :
+      `<td data-d="${c.日付}" style="height:46px;vertical-align:top;border:1px solid #eee;padding:2px;font-size:12px;${c.日付 === 暦の日 ? "background:#fff1d6;" : ""}${c.今日 ? "outline:2px solid #e08a1e;outline-offset:-2px;" : ""}">${c.日}${c.締切.length ? `<div style="margin-top:2px;border-radius:4px;background:${c.締切.some(x => x.期限切れ) ? "#f3b6b0" : "#f6d9a8"};font-size:10px;text-align:center">${c.締切.length}件</div>` : ""}</td>`).join("") + "</tr>").join("")}</table>
+    <button class="押す" id="今日へ">今日</button></div>
+    <div class="カード"><b>Googleカレンダー</b><p class="小">ふだんの予定を読み、締切型タスクと「朝の5分」を、頭に「［LP］」を付けた予定として書きます（通知付き）。ふだんの予定は、読むだけです。予定の中身は、このスマホの中だけで使います。</p>
+    <button class="押す 濃" id="Gつなぐ">つなぐ（読む＋反映）</button> <span class="小" id="G状態">${G予定 ? "前回：" + 安全(G予定.取得) + "（" + G予定.予定.length + "件）" : "まだ、つないでいません"}</span></div>
+    <h2>${暦の日.replace(/-/g, "/")} の予定（Google）</h2><div class="カード">${Gの予定(暦の日).map(e => `<div class="タスク行"><span>${安全(e.summary)}</span><span class="小">${(e.start || {}).dateTime ? 安全(e.start.dateTime.slice(11, 16)) : "終日"}</span></div>`).join("") || '<p class="小">' + (G予定 ? "この日の予定は、ありません" : "つなぐと、ここに出ます") + '</p>'}
+    ${G予定 ? (() => { const 空 = L.空き時間(G予定.予定, 暦の日, 設定); return '<p class="小">空き時間（8〜22時）：' + (空.map(x => x.開始 + "〜" + x.終了 + "（" + x.分 + "分）").join("、") || "なし") + "</p>"; })() : ""}
+    ${G予定 && 暦の日 === L.日付文字(new Date()) ? (() => { const 今 = L.今の空き(G予定.予定, new Date(), 設定); return '<p class="小">いまから次の予定まで：' + 今.分 + "分" + (今.選択 ? ' <button class="押す" id="空きで提案">「今なにする？」を ' + 今.選択 + "分で出す</button>" : "") + "</p>"; })() : ""}</div>
+    <h2>${暦の日.replace(/-/g, "/")} の締切</h2><div class="カード">${一覧.filter(x => x.日付 === 暦の日).map(行).join("") || '<p class="小">この日の締切は、ありません</p>'}
+    <button class="押す 濃" id="足す">この日が締切の課題を足す</button></div>
+    <h2>これからの締切（14日以内）と、期限切れ</h2><div class="カード">${一覧.filter(x => x.期限切れ || x.残り日 <= 14).map(行).join("") || '<p class="小">近い締切は、ありません</p>'}</div>`;
+  const 動かす = n => { 暦の月 += n; if (暦の月 < 1) { 暦の月 = 12; 暦の年--; } if (暦の月 > 12) { 暦の月 = 1; 暦の年++; } カレンダー画面(); };
+  $("前").onclick = () => 動かす(-1); $("次").onclick = () => 動かす(1);
+  $("今日へ").onclick = () => { 暦の年 = 0; カレンダー画面(); };
+  $("本体").querySelectorAll("td[data-d]").forEach(td => td.onclick = () => { 暦の日 = td.dataset.d; カレンダー画面(); });
+  $("足す").onclick = () => { 取っておく下書き = { 種類: "締切", 締切: 暦の日 + "T23:59" }; 移る("タスク"); };
+  $("Gつなぐ").onclick = Googleへつなぐ;
+  if ($("空きで提案")) $("空きで提案").onclick = () => { 今の空き = L.今の空き(G予定.予定, new Date(), 設定).選択; 移る("提案"); };
+}
+
+// ================= メモ（欲しい物・やりたい事。期限なし。タスクとは別） =================
+let 取っておく内容 = null, 取っておく下書き = null;                                        // 「タスクにする」で、タスク画面の内容欄に入れる
+function メモ画面(直す = null) {
+  const 種類 = L.メモ設定(設定).種類, 生 = L.生きている(データ.memos || []).slice().reverse(), m = 直す ? 生.find(x => x.id === 直す) : null;
+  $("本体").innerHTML = `<h1>メモ</h1><p class="小">欲しい物・やりたい事を、期限なしで書いておく所です。「今なにする？」には出ません。</p>
+    <div class="カード"><b>${m ? "直す" : "書く"}</b><textarea id="本文">${安全(m?.本文)}</textarea>
+    <label>種類</label><select id="種類">${種類.map(x => `<option>${安全(x)}</option>`).join("")}</select>
+    <button class="押す 濃" id="送る">${m ? "保存" : "メモする"}</button>${m ? '<button class="押す" id="やめる">やめる</button>' : ""} <span id="通知"></span></div>
+    <h2>メモ（${生.length}件）</h2><div class="カード" id="一覧"></div>`;
+  if (m) $("種類").value = m.種類;
+  $("送る").onclick = () => { try { m ? L.メモを直す(データ, 設定, m.id, $("本文").value, $("種類").value) : L.メモを足す(データ, 設定, $("本文").value, $("種類").value); 保存(); メモ画面(); setTimeout(() => 出す(m ? "直しました。" : "メモしました。"), 0); } catch (e) { 出す(e.message, true); } };
+  if (m) $("やめる").onclick = () => メモ画面();
+  $("一覧").innerHTML = 生.map(r => `<div class="タスク行"><div style="flex:1;min-width:0"><div style="white-space:pre-wrap;overflow-wrap:anywhere">${安全(r.本文)}</div><div class="小">${安全(r.種類)}　${安全((r.日付 || "").slice(0, 10))}</div></div>
+    <div><button class="押す" data-d="${r.id}">直す</button> <button class="押す" data-t="${r.id}">タスクにする</button> <button class="押す" data-x="${r.id}">消す</button></div></div>`).join("") || '<p class="小">まだありません</p>';
+  $("一覧").querySelectorAll("[data-d]").forEach(b => b.onclick = () => メモ画面(+b.dataset.d));
+  $("一覧").querySelectorAll("[data-t]").forEach(b => b.onclick = () => { const r = 生.find(x => x.id === +b.dataset.t); 取っておく内容 = r.本文.split("\n")[0].slice(0, 60); 移る("タスク"); });
+  $("一覧").querySelectorAll("[data-x]").forEach(b => b.onclick = () => { if (confirm("このメモを消します。よろしいですか？")) { try { L.メモを消す(データ, +b.dataset.x); 保存(); メモ画面(); } catch (e) { 出す(e.message, true); } } });
 }
 
 // ================= 預ける =================
@@ -105,10 +210,70 @@ function 預ける画面() {
     <label>種類（なくてもよい）</label><select id="種類"><option value="">（付けない）</option>${s.預ける種類.map(x => `<option>${x}</option>`).join("")}</select>
     <label>いつ、返してもらいますか</label><select id="返す">${s.返す日の選択肢.map(x => `<option>${x.名前}</option>`).join("")}</select>
     <button class="押す 濃" id="預けボタン">預ける</button> <span id="通知"></span></div>
-    <p class="小">預けた記録は、Mac で、受け取り箱に届きます（スマホ版の受け取り箱は、次の段階で作ります）。</p>`;
+    <div id="箱"></div>`;
   $("預けボタン").onclick = () => {
     try { const d = L.預ける(データ, 設定, $("本文").value, $("種類").value || null, $("返す").value); 保存(); 預ける画面(); setTimeout(() => 出す("預けました。" + (d.返す日 ? d.返す日 + " に、届きます。" : "記録だけ残します。")), 0); } catch (e) { 出す(e.message, true); }
   };
+  箱を描く();
+}
+// ---- 受け取り箱（返す日が来た預け。開くのは本人。催促はしない） ----
+function 箱を描く(開く = null) {
+  const 件 = L.箱の中身(データ);
+  if (開く !== null) {
+    let r; try { r = L.預けを開く(データ, 開く); 保存(); } catch (e) { $("箱").innerHTML = `<p class="エラー">${安全(e.message)}</p>`; return; }
+    $("箱").innerHTML = `<h2>受け取り箱</h2><div class="カード"><p class="小">過去の自分から（${安全(r.日付.slice(0, 16))}）</p><p style="font-size:18px;white-space:pre-wrap" id="預け本文"></p>
+      <p class="小">${r.体 !== null || r.気分 ? "預けた時：体" + (r.体 ?? "—") + "%・気分" + (r.気分 ?? "—") : "預けた時の体と気分：入力なし"}</p>
+      <div class="行ボタン"><button data-x="いまも同じ">いまも同じ</button><button data-x="変わった">変わった</button><button data-x="消す">消す</button><button data-x="閉じる">いまは閉じる</button></div><div id="預け直し"></div><span id="通知"></span></div>`;
+    $("預け本文").textContent = r.本文;                       // 記録そのまま（AIの解釈なし）
+    $("箱").querySelectorAll("[data-x]").forEach(b => b.onclick = () => {
+      const x = b.dataset.x;
+      if (x === "閉じる") return 箱を描く();
+      if (x === "変わった" && !$("新しい")) {
+        $("預け直し").innerHTML = `<p class="小">いまの一言を、あらためて預けますか（書かなくてもかまいません）。</p><textarea id="新しい"></textarea><select id="新しい返す">${設定.柱B.返す日の選択肢.map(y => `<option>${y.名前}</option>`).join("")}</select><button class="押す 濃" id="決める">決める</button>`;
+        $("決める").onclick = () => 反応を決める(r.id, "変わった"); return;
+      }
+      if (x === "消す" && !confirm("この預けを消します。よいですか？")) return;
+      反応を決める(r.id, x);
+    });
+    return;
+  }
+  $("箱").innerHTML = `<h2>受け取り箱${件.length ? "（" + 件.length + "件）" : ""}</h2>` + (件.length
+    ? 件.map(r => `<div class="カード"><span class="小">${安全(r.日付.slice(0, 10))} に預けた分（${安全(r.返す日)} に届きました）</span><br><button class="押す" data-id="${r.id}">開く</button></div>`).join("")
+    : '<p class="小">受け取り箱は、いま、空です。</p>');
+  $("箱").querySelectorAll("[data-id]").forEach(b => b.onclick = () => 箱を描く(Number(b.dataset.id)));
+}
+function 反応を決める(id, 反応) {
+  try { L.預けに反応する(データ, 設定, id, 反応, $("新しい") ? $("新しい").value : null, $("新しい返す") ? $("新しい返す").value : "なし"); 保存(); 箱を描く(); } catch (e) { 出す(e.message, true); }
+}
+
+// ================= 夜の封印 =================
+function 夜画面() {
+  const 生 = L.生きている(データ.tasks).filter(x => !x.倉庫), 封 = L.今の封(データ), 封タスク = 封 && 生.find(t => t.id === 封.タスクid);
+  $("本体").innerHTML = `<h1>明日何やる？</h1><p class="小">今日の迷いをひとつ預けて、朝の5分でやることを、ひとつ決めて封をします。迷いがない夜は、預けずに、封をするだけでかまいません。</p>
+    <div class="カード"><b>① 迷いを預ける（なくてもよい）</b><textarea id="本文" placeholder="迷っていること"></textarea>
+    <label>いつ、返してもらいますか</label><select id="返す">${設定.柱B.返す日の選択肢.map(x => `<option>${x.名前}</option>`).join("")}</select>
+    <button class="押す" id="預けボタン">預ける</button> <span class="小" id="預けた"></span></div>
+    <div class="カード"><b>② 朝の5分でやることを、ひとつ決めて封をする</b>
+    <label>タスク</label><select id="タスク">${生.map(t => `<option value="${t.id}">${安全(t.内容)}（${t.見積もり分}分）</option>`).join("")}</select>
+    <button class="押す 濃" id="封ボタン">封をする</button><button class="押す" id="やめるボタン">封を、やめる</button> <span id="通知"></span>
+    ${封タスク ? `<p class="小">いま、封がしてあります：<b>${安全(封タスク.内容)}</b>（${安全(封.対象日)} の朝に、「今なにする？」の上に出ます）</p>` : ""}</div>`;
+  $("預けボタン").onclick = () => { const 本文 = $("本文").value.trim(); if (!本文) { $("預けた").textContent = "（迷いがない夜は、預けずに、次へ進めます）"; return; }
+    try { L.預ける(データ, 設定, 本文, "迷い", $("返す").value); 保存(); $("本文").value = ""; $("預けた").textContent = "預けました"; } catch (e) { $("預けた").textContent = e.message; } };
+  $("封ボタン").onclick = () => { try { L.封じる(データ, 設定, Number($("タスク").value)); 保存(); 夜画面(); setTimeout(() => 出す("封をしました。おやすみなさい。"), 0); } catch (e) { 出す(e.message, true); } };
+  $("やめるボタン").onclick = () => { L.封をやめる(データ); 保存(); 夜画面(); setTimeout(() => 出す("封を、やめました。"), 0); };
+}
+
+// ================= ニュース（見るだけ。Mac で集めた見出しを、同期で受け取る） =================
+function ニュース画面() {
+  let ニュース = []; try { ニュース = JSON.parse(localStorage.getItem("lifepilot_news") || "[]"); } catch (e) {}
+  const 並び = L.ニュースを並べる(ニュース, 設定);
+  $("本体").innerHTML = `<h1>ニュース</h1><p class="小">Yahoo!ニュースの「IT」の見出しです（個人利用のみ）。Mac で「更新」して、同期すると、ここに届きます。スマホからは、更新できません。</p><div id="一覧"></div>`;
+  $("一覧").innerHTML = 並び.length ? "" : '<p class="小">見出しが、まだ、ありません。Mac で、ニュースを更新して、同期してください。</p>';
+  for (const r of 並び) {
+    const 行 = document.createElement("div"); 行.className = "カード"; 行.innerHTML = `<a target="_blank" rel="noopener" style="font-weight:bold;color:#222;text-decoration:none"></a><br><span class="小"></span>`;
+    const a = 行.querySelector("a"); a.textContent = (r.合う語.length ? "★ " : "") + r.見出し; a.href = r.リンク;
+    行.querySelector(".小").textContent = (r.掲載日時 || "") + "　" + (r.理由 || ""); $("一覧").appendChild(行);
+  }
 }
 
 // ================= 今なにする？ =================
@@ -121,9 +286,50 @@ function 提案画面() {
   $("本体").innerHTML = `<h1>今なにする？</h1>
     <p class="小">${状態 ? `使っている入力：体${状態.体}%・気分${状態.気分}${状態.電池 !== null ? "・電池" + 状態.電池 + "%" : ""}` : "入力がないので、体と気分は使っていません。「体と気分」から入れられます。"}</p>
     <p>空き時間を選んでください。</p><div class="選択" id="空き">${選択肢.map((x, i) => `<button data-v="${x}">${x}分${i === 選択肢.length - 1 ? "以上" : ""}</button>`).join("")}</div>
-    <div id="カード"></div>`;
+    <div id="封印"></div><div id="カード"></div><div id="問い"></div>`;
+  封印を出す(); 問いを出す();
   $("空き").onclick = e => { const b = e.target.closest("button"); if (!b) return; 今の空き = Number(b.dataset.v); 提案を出す(); };
   if (今の空き) 提案を出す();
+}
+function 封印を出す() {
+  const r = L.今日の封印(データ); if (!r) { $("封印").innerHTML = ""; return; }
+  $("封印").innerHTML = `<div class="カード"><p class="小">昨夜、封をした、朝の5分です</p><p class="一手"></p><div class="行ボタン"><button class="押す 濃" id="封始める">5分だけ、やる</button><button class="押す" id="封見送る">今日はやらない</button></div></div>`;
+  $("封印").querySelector(".一手").textContent = r.タスク.内容;
+  $("封始める").onclick = () => { L.封を済にする(データ, r.id, "始めた"); 保存(); 五分を始める(r.タスク); };
+  $("封見送る").onclick = () => { L.封を済にする(データ, r.id, "今日はやらない"); 保存(); $("封印").innerHTML = ""; };
+}
+function 問いを出す() {
+  const q = L.次の問い(データ, 設定); if (!q) { $("問い").innerHTML = ""; return; }
+  $("問い").innerHTML = `<div class="カード" style="border-style:dashed"><p class="小">ひとつだけ、聞いてもいいですか（答えなくてもかまいません）</p><p><b>${安全(q.問い)}</b></p>
+    <div class="選択">${q.選択肢.map(x => `<button data-s="${安全(x)}">${安全(x)}</button>`).join("")}</div><input id="問いの一言" placeholder="ひとこと（選ばずに、書くだけでもよい）">
+    <div class="行ボタン"><button class="押す" id="一言で">この一言で答える</button><button class="押す" id="今日はやめる">今日はやめておく</button></div><p id="問いの通知" class="エラー"></p></div>`;
+  const 答える = 選択 => { try { L.価値観に答える(データ, 設定, q.キー, 選択, $("問いの一言").value); 保存(); 問いを出す(); } catch (e) { $("問いの通知").textContent = e.message; } };
+  $("問い").querySelectorAll("[data-s]").forEach(b => b.onclick = () => 答える(b.dataset.s)); $("一言で").onclick = () => 答える(null);
+  $("今日はやめる").onclick = () => { L.価値観を今日はやめる(データ, 設定, q.キー); 保存(); 問いを出す(); };
+}
+function 分解を出す(x) {          // タスク分解：ひな形の案を出し、書き換えてから足す（元のタスクは残る）
+  let 案; try { 案 = L.分解の案(x, 設定); } catch (e) { 出す(e.message, true); return; }
+  document.querySelectorAll(".分解の箱").forEach(b => b.remove());
+  const 箱 = document.createElement("div"); 箱.className = "カード 分解の箱";
+  箱.innerHTML = `<p class="小"></p><textarea style="width:100%;min-height:9em;box-sizing:border-box"></textarea><div class="行ボタン"><button class="押す 濃">この内容で足す</button><button class="押す">やめる</button></div>`;
+  箱.querySelector("p").textContent = "「" + x.内容 + "」を、小さく分ける案です。1行に「内容｜分」。書き換えられます。足しても、元のタスクは残ります（小さいタスクは、種類「どちらでもない」）。";
+  箱.querySelector("textarea").value = 案.map(p => p.内容 + "｜" + p.分).join("\n");
+  const [足す, やめる] = 箱.querySelectorAll("button");
+  やめる.onclick = () => 箱.remove();
+  足す.onclick = () => {
+    const 手順 = 箱.querySelector("textarea").value.split("\n").filter(l => l.trim()).map(l => { const [内容, 分] = l.split("｜"); return { 内容: (内容 || "").trim(), 分: Number((分 || "").trim()) }; });
+    try { const n = L.分解して足す(データ, 設定, x.id, 手順).length; 保存(); タスク画面(); setTimeout(() => 出す(n + "件の小さなタスクを足しました"), 0); } catch (e) { 出す(e.message, true); }
+  };
+  $("本体").prepend(箱); window.scrollTo(0, 0);
+}
+function 時間を聞く(x) {          // 相場帳：どのくらいかかったか、1タップで聞く（答えなくてよい）
+  const 分 = (設定.相場帳 || {}).選択肢分 || [5, 15, 30, 60, 90], 箱 = document.createElement("div");
+  箱.className = "カード"; 箱.innerHTML = `<p class="小"></p><div class="行ボタン"></div>`;
+  箱.querySelector("p").textContent = "「" + x.内容 + "」は、どのくらいかかりましたか？（見積もり " + x.見積もり分 + "分）";
+  const 行 = 箱.querySelector(".行ボタン");
+  分.forEach((m, i) => { const b = document.createElement("button"); b.textContent = m + "分" + (i === 分.length - 1 ? "以上" : ""); b.onclick = () => { try { L.相場を足す(データ, 設定, x.id, x.種類, x.見積もり分, m); 保存(); 箱.remove(); 出す("記録しました（相場帳）"); } catch (e) { 出す(e.message, true); } }; 行.appendChild(b); });
+  const 不 = document.createElement("button"); 不.textContent = "答えない"; 不.onclick = () => 箱.remove(); 行.appendChild(不);
+  $("本体").prepend(箱);
 }
 function 提案を出す() {
   $("空き").querySelectorAll("button").forEach(b => b.classList.toggle("選ばれ", Number(b.dataset.v) === 今の空き));
@@ -154,20 +360,40 @@ function 反応する(x) {
 }
 function 五分を始める(タスク) {
   五分の記録 = L.五分を始める(データ, タスク.id); 保存();
-  const 分 = 設定.柱A["5分だけの分"], 終わり = Date.now() + 分 * 60 * 1000;
+  // 見積もりが5分より短いタスクは、見積もりの分だけ（5分以上のタイマーは付けない）
+  const 分 = Math.min(設定.柱A["5分だけの分"], タスク.見積もり分 || 設定.柱A["5分だけの分"]), 開始 = Date.now(), 終わり = 開始 + 分 * 60 * 1000;
   $("本体").innerHTML = `<h1>${分}分だけ、触ってみます</h1><div class="カード"><p class="一手"></p><p class="時間" id="時間"></p><button class="押す" id="中断">中断する</button></div>`;
   $("本体").querySelector(".一手").textContent = タスク.内容;
-  $("中断").onclick = () => 五分を終える("中断");
+  $("中断").onclick = () => 五分を終える("中断", 開始);
   clearInterval(時計);
   時計 = setInterval(() => {
     const 残り = Math.max(0, Math.round((終わり - Date.now()) / 1000)); $("時間").textContent = Math.floor(残り / 60) + ":" + String(残り % 60).padStart(2, "0");
     if (残り === 0) { clearInterval(時計); $("本体").innerHTML = `<h1>${分}分、おつかれさまでした</h1><div class="カード"><p>この後は、どうしますか。</p><div class="行ボタン">${設定.柱A["5分だけ終わりの選択肢"].map(x => `<button data-x="${x}">${x}</button>`).join("")}</div></div>`;
-      $("本体").querySelectorAll("[data-x]").forEach(b => b.onclick = () => 五分を終える(b.dataset.x)); }
+      $("本体").querySelectorAll("[data-x]").forEach(b => b.onclick = () => 五分を終える(b.dataset.x, 開始, タスク)); }
   }, 250);
 }
-function 五分を終える(結果) {
-  clearInterval(時計); try { L.五分を終える(データ, 設定, 五分の記録, 結果); } catch (e) {} 保存();
-  $("本体").innerHTML = `<h1>記録しました</h1><div class="カード"><p class="完了">${結果 === "中断" ? "中断しました。それでも、触れたことは記録しました。" : "「" + 結果 + "」を記録しました。"}</p><button class="押す 濃" onclick="移る('提案')">もう一度、提案を出す</button></div>`;
+// 「続ける」：タイマーを止めずに計り続け、止めたときに見積もりとの差を出す
+function 続けて計る(開始, タスク) {
+  $("本体").innerHTML = `<h1>続けています（計っています）</h1><div class="カード"><p class="一手"></p><p class="時間" id="時間"></p><p class="小" id="差の文"></p><button class="押す" id="止める">止める</button></div>`;
+  $("本体").querySelector(".一手").textContent = タスク.内容;
+  $("止める").onclick = () => 五分を終える("続ける", 開始, タスク, true);
+  clearInterval(時計);
+  時計 = setInterval(() => {
+    const 秒 = Math.round((Date.now() - 開始) / 1000);
+    $("時間").textContent = Math.floor(秒 / 60) + ":" + String(秒 % 60).padStart(2, "0"); $("差の文").textContent = 差の文(秒 / 60, タスク);
+  }, 250);
+}
+function 差の文(分, タスク) {
+  const 見 = タスク && タスク.見積もり分; if (!見) return "";
+  const 差 = Math.round((分 - 見) * 10) / 10;
+  return "見積もり " + 見 + "分 ／ いま " + (Math.round(分 * 10) / 10) + "分（" + (差 > 0 ? "見積もりより " + 差 + "分 長い" : 差 < 0 ? "見積もりまで あと " + (-差) + "分" : "ちょうど") + "）";
+}
+function 五分を終える(結果, 開始, タスク, 続け中 = false) {
+  if (結果 === "続ける" && !続け中) { 続けて計る(開始, タスク); return; }
+  clearInterval(時計);
+  const 実績分 = Math.round((Date.now() - 開始) / 6000) / 10;      // 実際にかかった分（0.1分単位）
+  try { L.五分を終える(データ, 設定, 五分の記録, 結果, new Date(), 実績分); } catch (e) {} 保存();
+  $("本体").innerHTML = `<h1>記録しました</h1><div class="カード"><p class="完了">${結果 === "中断" ? "中断しました。それでも、触れたことは記録しました。" : "「" + 結果 + "」を記録しました。"}</p><p class="小">${差の文(実績分, タスク)}</p><button class="押す 濃" onclick="移る('提案')">もう一度、提案を出す</button></div>`;
 }
 
 // ================= 同期（Google ドライブ） =================
@@ -180,7 +406,7 @@ function 同期画面() {
     <p class="小" id="結果">${前 ? "前回：" + 前.日時 + "（" + 前.文 + "）" : "まだ、同期していません"}</p></div>
     <div class="カード"><label>Google のクライアントID（最初の1回だけ入れます）</label><input id="クライアントID" value="${安全(id)}" placeholder="xxxx.apps.googleusercontent.com" autocapitalize="off" autocorrect="off">
     <p class="小">Google Cloud で作る、アプリの「名前札」です（秘密ではありません）。入れ方は、準備の手順にあります。</p></div>
-    <p class="小">記録の数：タスク ${L.生きている(データ.tasks).length}件・預け ${L.生きている(データ.deposits).length}件・提案の記録 ${データ.suggestion_log.length}件。同期するまでは、このスマホの中だけです。ブラウザの「サイトのデータを消去」をすると、消えます。</p>`;
+    <p class="小">記録の数：タスク ${L.生きている(データ.tasks).length}件・預け ${L.生きている(データ.deposits).length}件・メモ ${L.生きている(データ.memos || []).length}件・提案の記録 ${データ.suggestion_log.length}件。同期するまでは、このスマホの中だけです。ブラウザの「サイトのデータを消去」をすると、消えます。</p>`;
   $("同期ボタン").onclick = 同期する;
 }
 async function 同期する() {
@@ -192,7 +418,7 @@ async function 同期する() {
     const ドライブ = await LifePilotDrive.ドライブを作る(id);
     const r = await L.同期を実行(ドライブ, データ);
     データ = Object.assign(空データ(), r.新しいデータ); 保存();
-    if (r.設定) { 設定 = r.設定; try { localStorage.setItem("lifepilot_settings", JSON.stringify(設定)); } catch (e) {} }
+    if (r.設定) { 設定 = r.設定; await エルピーの設定を補う(); try { localStorage.setItem("lifepilot_settings", JSON.stringify(設定)); } catch (e) {} }
     if (r.ニュース) { try { localStorage.setItem("lifepilot_news", JSON.stringify(r.ニュース)); } catch (e) {} }
     const 文 = r.報告.入った ? "相手から " + r.報告.入った + "件が入りました" : "新しく入った物は、ありませんでした";
     try { localStorage.setItem("lifepilot_lastsync", JSON.stringify({ 日時: L.時刻文字(new Date()).slice(0, 16), 文 })); } catch (e) {}
@@ -201,5 +427,5 @@ async function 同期する() {
 }
 
 // ================= 開始 =================
-(async () => { 読み込む(); await 設定を読む(); if (!画面一覧.some(x => x[0] === 画面)) 画面 = "提案"; 描く(); })().catch(e => { document.body.innerHTML = "<p style='padding:20px'>読み込めませんでした：" + e.message + "</p>"; });
+(async () => { 読み込む(); await 設定を読む(); await エルピーの設定を補う(); try { L.開く(データ); 保存(); } catch (e) {} if (!画面一覧.some(x => x[0] === 画面)) 画面 = "提案"; 描く(); })().catch(e => { document.body.innerHTML = "<p style='padding:20px'>読み込めませんでした：" + e.message + "</p>"; });
 </script></body></html>
