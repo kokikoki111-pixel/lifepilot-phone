@@ -1,3 +1,4 @@
+@import url("フォント/フォント.css");   /* DotGothic16・Chakra Petch・Share Tech Mono（OFL。スマホ版/フォント/） */
 /* LifePilot の見た目の共通の型（テーマ）。Mac 版の全画面と、スマホ版で共通に使う。
    世界観：パソコンの中に生まれた街「ルミナ・パレス」。深い基板の緑、金の配線、光る縁。
    画面ごとに、その機能が置かれた地区の色（body の data-地区）がつく。題の帯にだけ、地区の絵（画像AIで作った 絵/地区_*.jpg）を敷く。
@@ -712,6 +713,69 @@ body.lp-スマホ #本体 > h1:first-of-type { letter-spacing: .14em; text-shado
 body.lp-スマホ nav#タブ { background: rgba(8, 10, 9, .97) !important; border-top: 1px solid rgba(var(--n-骨rgb), .4) !important; }
 body.lp-スマホ nav#タブ button { color: rgba(var(--n-骨rgb), .75) !important; border-top: none !important; font-family: var(--lp-字); letter-spacing: .04em; }
 body.lp-スマホ nav#タブ button.今 { color: #0b0d0c !important; background: var(--n-骨) !important; text-shadow: none !important; box-shadow: inset 0 3px 0 var(--n-黄) !important; }
+
+/* ================= 14. 字と、動く背景（2026-10-27）。字＝DotGothic16（見出し・札・ボタン）＋Chakra Petch（英数字）＋Share Tech Mono（計器）。
+   背景＝基板の絵（ゆっくり動く）＋配線を流れる光＋漂う光の粒＋走査の光。窓は半透明で、地区の絵を薄く敷く ================= */
+:root {
+  --n-見出し: "Chakra Petch", "DotGothic16", "Hiragino Sans", sans-serif;
+  --lp-等幅: "Share Tech Mono", "DotGothic16", ui-monospace, monospace;
+  --n-背景: url("絵/背景_横.jpg"), url("絵/街.jpg");
+}
+@media (max-aspect-ratio: 1/1) { :root { --n-背景: url("絵/背景_縦.jpg"), url("絵/街.jpg"); } }
+h1, h2, h3, .lp-題 h1, .lp-道 a, .lp-道 .lp-組, button, label, th, .lp-地区, .カード > b:first-child, .lp-書式の題, .一言 b,
+body.lp-スマホ nav#タブ button, body.lp-スマホ #本体::before { font-family: var(--n-見出し) !important; }
+.lp-題 h1 { font-weight: 400 !important; font-size: 27px !important; }
+input[type="number"], input[type="datetime-local"], input[type="date"], input[type="time"], .時間, .操作 b { font-family: var(--lp-等幅) !important; }
+
+/* --- 画面の奥：基板の絵（ゆっくり寄って引く）・配線の光・光の粒・走査の光 --- */
+html, body.lp { background: #050706 !important; }
+body.lp { background: transparent !important; }
+html::before {
+  content: ""; position: fixed; inset: -6%; z-index: -3; pointer-events: none;
+  background: var(--n-背景); background-size: cover; background-position: center;
+  filter: saturate(1.1) brightness(.62) contrast(1.08);
+  animation: n-寄る 70s ease-in-out infinite alternate;
+}
+html::after {
+  content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background:
+    radial-gradient(circle, rgba(255, 238, 160, .9) 0 1.2px, transparent 2px) 0 0 / 190px 230px,
+    radial-gradient(circle, rgba(79, 243, 255, .75) 0 1px, transparent 1.8px) 60px 90px / 260px 210px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='480'%3E%3Cg fill='none' stroke='%23c9a24a' stroke-opacity='.22' stroke-width='2'%3E%3Cpath d='M0 60H140L180 100H320L360 60H480'/%3E%3Cpath d='M60 0V120L100 160V300L60 340V480'/%3E%3Cpath d='M480 220H380L340 260H200L160 300H0'/%3E%3Cpath d='M260 0V40L300 80V200'/%3E%3Cpath d='M420 480V400L380 360V300L420 260'/%3E%3Cpath d='M0 420H90L130 380H260L300 420H480'/%3E%3Cpath d='M200 480V440L240 400'/%3E%3C/g%3E%3Cg fill='%230a0d0c' stroke='%23c9a24a' stroke-opacity='.35' stroke-width='1.5'%3E%3Ccircle cx='140' cy='60' r='4'/%3E%3Ccircle cx='320' cy='100' r='4'/%3E%3Ccircle cx='60' cy='120' r='4'/%3E%3Ccircle cx='100' cy='300' r='4'/%3E%3Ccircle cx='380' cy='220' r='4'/%3E%3Ccircle cx='200' cy='260' r='4'/%3E%3Ccircle cx='300' cy='200' r='4'/%3E%3Ccircle cx='420' cy='260' r='4'/%3E%3Ccircle cx='130' cy='380' r='4'/%3E%3Ccircle cx='300' cy='420' r='4'/%3E%3Ccircle cx='240' cy='400' r='4'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff1a8' stroke-width='2.6' stroke-linecap='round' stroke-dasharray='18 502' stroke-opacity='.85'%3E%3Cpath d='M0 60H140L180 100H320L360 60H480'%3E%3Canimate attributeName='stroke-dashoffset' from='520' to='0' dur='3.2s' begin='-0.0s' repeatCount='indefinite'/%3E%3C/path%3E%3Cpath d='M60 0V120L100 160V300L60 340V480'%3E%3Canimate attributeName='stroke-dashoffset' from='520' to='0' dur='3.9s' begin='-0.9s' repeatCount='indefinite'/%3E%3C/path%3E%3Cpath d='M480 220H380L340 260H200L160 300H0'%3E%3Canimate attributeName='stroke-dashoffset' from='520' to='0' dur='4.6s' begin='-1.8s' repeatCount='indefinite'/%3E%3C/path%3E%3Cpath d='M260 0V40L300 80V200'%3E%3Canimate attributeName='stroke-dashoffset' from='520' to='0' dur='5.3s' begin='-2.7s' repeatCount='indefinite'/%3E%3C/path%3E%3Cpath d='M420 480V400L380 360V300L420 260'%3E%3Canimate attributeName='stroke-dashoffset' from='520' to='0' dur='6.0s' begin='-3.6s' repeatCount='indefinite'/%3E%3C/path%3E%3Cpath d='M0 420H90L130 380H260L300 420H480'%3E%3Canimate attributeName='stroke-dashoffset' from='520' to='0' dur='6.7s' begin='-4.5s' repeatCount='indefinite'/%3E%3C/path%3E%3Cpath d='M200 480V440L240 400'%3E%3Canimate attributeName='stroke-dashoffset' from='520' to='0' dur='7.4s' begin='-5.4s' repeatCount='indefinite'/%3E%3C/path%3E%3C/g%3E%3C/svg%3E") 0 0 / 480px 480px,
+    radial-gradient(ellipse at 50% 40%, transparent 0 45%, rgba(0, 0, 0, .55) 100%);
+  opacity: .9; animation: n-漂う 38s linear infinite;
+}
+body.lp > .lp-走査, body.lp::after {
+  content: ""; position: fixed; left: 0; right: 0; top: -20vh; height: 18vh; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(79, 243, 255, .07) 45%, rgba(255, 255, 255, .12) 50%, rgba(79, 243, 255, .07) 55%, transparent);
+  animation: n-走る 9s linear infinite;
+}
+@keyframes n-寄る { 0% { transform: scale(1) translate(0, 0); } 50% { transform: scale(1.08) translate(-1.5%, 1%); } 100% { transform: scale(1.04) translate(1.5%, -1%); } }
+@keyframes n-漂う { from { background-position: 0 0, 60px 90px, 0 0, 0 0; } to { background-position: 0 -460px, 60px -330px, 0 0, 0 0; } }
+@keyframes n-走る { 0% { transform: translateY(0); } 70%, 100% { transform: translateY(140vh); } }
+
+/* --- 窓：半透明にして奥の街を透かし、地区の絵を薄く敷く。中で斜めの光がゆっくり通る --- */
+.lp-窓, body.lp-スマホ #本体 {
+  background:
+    linear-gradient(180deg, rgba(8, 11, 10, .80), rgba(8, 11, 10, .9)),
+    var(--lp-帯, linear-gradient(transparent, transparent)) center 30% / cover no-repeat,
+    rgba(8, 11, 10, .85) !important;
+  -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px);
+  isolation: isolate;
+}
+.lp-窓::after, body.lp-スマホ #本体::after {
+  content: "" !important; display: block !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(var(--n-骨rgb), .045) 48%, rgba(79, 243, 255, .06) 50%, transparent 58%) 0 0 / 300% 100% no-repeat;
+  animation: n-通る 11s ease-in-out infinite;
+}
+body.lp-スマホ #本体 { position: relative; }
+.lp-窓 > *, body.lp-スマホ #本体 > * { position: relative; z-index: 1; }
+@keyframes n-通る { 0% { background-position: 120% 0; } 60%, 100% { background-position: -40% 0; } }
+
+/* --- カードの中も、少しだけ透かす --- */
+.カード, .lp-書式, .箱, .部屋, .状態, .問い, details, #説明, .panel, .survey, #msgs { -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+
+@media (prefers-reduced-motion: reduce) { html::before, html::after, body.lp::after, .lp-窓::after, body.lp-スマホ #本体::after { animation: none !important; } }
 
 /* ================= 12. 動きを減らす設定 ================= */
 @media (prefers-reduced-motion: reduce) {
