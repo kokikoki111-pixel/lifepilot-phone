@@ -1,0 +1,425 @@
+/* LifePilot の見た目の共通の型（テーマ）。Mac 版の全画面と、スマホ版で共通に使う。
+   世界観：パソコンの中に生まれた街「ルミナ・パレス」。深い基板の緑、金の配線、光る縁。
+   画面ごとに、その機能が置かれた地区の色（body の data-地区）がつく。題の帯にだけ、地区の絵（画像AIで作った 絵/地区_*.jpg）を敷く。
+   各ページの <style> の後に読み込む（同じ強さの決まりは、こちらが勝つ）。動きを減らす設定では、動きを止める。 */
+
+/* ================= 1. 色と形の決まり（トークン） ================= */
+:root {
+  color-scheme: dark;
+  /* 基板 */
+  --lp-基板: #06140e;          /* いちばん奥の背景 */
+  --lp-基板2: #0a1f16;
+  --lp-板: #0d3b2a;            /* 絵の「板」と同じ */
+  --lp-面: #0c2a1e;            /* 窓の中 */
+  --lp-面2: #0f3325;           /* 窓の中の小さな枠 */
+  --lp-入力: #05170f;          /* 入力欄 */
+  --lp-線: #2a5a47;            /* 区切り線 */
+  --lp-線明: #3d7a60;
+  --lp-銅: #1f7a54;            /* 絵の「銅」（配線） */
+  --lp-金: #d4a63a;            /* 絵の「金」（金の配線） */
+  --lp-金明: #ffd36b;
+  --lp-ミント: #9fe3c4;
+  /* 文字（窓の中の背景に対して 4.5:1 以上） */
+  --lp-文字: #e6f2ea;
+  --lp-副: #a9c7b8;
+  --lp-淡: #8fb0a0;
+  /* 知らせの色 */
+  --lp-誤: #ff8f80;  --lp-誤地: rgba(255, 107, 91, .14);
+  --lp-済: #8fe6a8;  --lp-済地: rgba(127, 209, 168, .14);
+  --lp-注: #ffb86b;
+  --lp-青: #8fc0f0;
+  /* 地区の色（既定は、街＝金）。body[data-地区] で変わる */
+  --lp-色: #ffd36b;  --lp-色rgb: 255, 211, 107;
+  /* 形 */
+  --lp-角: 14px;  --lp-角小: 10px;
+  --lp-字: "Hiragino Sans", "BIZ UDPGothic", "Noto Sans JP", -apple-system, sans-serif;
+  --lp-等幅: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --lp-押す高: 40px;
+  /* 前からある名前（エルピーの窓・通信・スマホ版が使う）も、街の色にそろえる */
+  --bg: var(--lp-基板); --panel: var(--lp-面); --card: var(--lp-面2); --text: var(--lp-文字);
+  --sub: var(--lp-副); --line: var(--lp-線); --accent: var(--lp-金); --me: #1d4a38;
+}
+@media (pointer: coarse), (max-width: 700px) { :root { --lp-押す高: 44px; } }
+
+/* 地区の色（世界観 17_設定集 の、機能の置き場所） */
+[data-地区="港"]     { --lp-色: #ffd36b; --lp-色rgb: 255, 211, 107; }  /* Lantern Pier：灯籠 */
+[data-地区="広場"]   { --lp-色: #9fe3c4; --lp-色rgb: 159, 227, 196; }  /* Link Plaza：時刻盤の光の文字 */
+[data-地区="計測所"] { --lp-色: #c9e86b; --lp-色rgb: 201, 232, 107; }  /* 広場の計測所 */
+[data-地区="楼閣"]   { --lp-色: #e59cff; --lp-色rgb: 229, 156, 255; }  /* Loud Pavilion：極彩色 */
+[data-地区="穴"]     { --lp-色: #b7c6d6; --lp-色rgb: 183, 198, 214; }  /* Loop Pit：霧 */
+[data-地区="図書館"] { --lp-色: #9fbcf5; --lp-色rgb: 159, 188, 245; }  /* Lore Pages：淡く光る背表紙 */
+[data-地区="灯台"]   { --lp-色: #6fd3f7; --lp-色rgb: 111, 211, 247; }  /* Line Port：灯台の光 */
+[data-地区="遊歩道"] { --lp-色: #d6c8ff; --lp-色rgb: 214, 200, 255; }  /* Lune Passage：月とショーウィンドウ */
+[data-地区="池"]     { --lp-色: #5fd0e6; --lp-色rgb: 95, 208, 230; }   /* Lunar Pool：冷えた水 */
+[data-地区="制御室"] { --lp-色: #b5d36a; --lp-色rgb: 181, 211, 106; }  /* BIOS室：苔とモスの電池の窓 */
+[data-地区="反応室"] { --lp-色: #ff9fc4; --lp-色rgb: 255, 159, 196; }  /* 塔の地下の反応室 */
+[data-地区="鍛錬場"] { --lp-色: #ffab73; --lp-色rgb: 255, 171, 115; }  /* 鍛錬場 */
+[data-地区="街"]     { --lp-色: #ffd36b; --lp-色rgb: 255, 211, 107; }  /* ルミナ・パレス全体 */
+
+/* ================= 2. 背景（基板。CSS のグラデーションだけ） ================= */
+html {
+  min-height: 100%;
+  background:
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(31, 122, 84, .28), transparent 70%),
+    radial-gradient(circle, rgba(159, 227, 196, .10) 1.2px, transparent 1.8px) 0 0 / 24px 24px,
+    linear-gradient(90deg, transparent 47px, rgba(212, 166, 58, .08) 47px, rgba(212, 166, 58, .08) 49px, transparent 49px) 0 0 / 192px 192px,
+    linear-gradient(0deg, transparent 95px, rgba(31, 122, 84, .18) 95px, rgba(31, 122, 84, .18) 97px, transparent 97px) 0 0 / 192px 192px,
+    linear-gradient(180deg, var(--lp-基板2), var(--lp-基板) 60%);
+  background-color: var(--lp-基板);
+  background-attachment: fixed;
+}
+body, body.lp {
+  color: var(--lp-文字);
+  font-family: var(--lp-字);
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  background: transparent;
+}
+/* 地区の気配：画面の上に、その地区の色が、うすく灯る */
+body.lp::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse 70% 45% at 20% 0%, rgba(var(--lp-色rgb), .11), transparent 70%);
+}
+::selection { background: rgba(var(--lp-色rgb), .35); color: #fff; }
+
+/* 見出し・文字・リンク */
+h1, h2, h3, h4 { color: var(--lp-文字); letter-spacing: .02em; }
+h2 { color: var(--lp-色); font-size: 16px; padding-bottom: 6px; border-bottom: 1px solid var(--lp-線); }
+h2::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; vertical-align: 1px;
+  border: 1.5px solid var(--lp-金); border-radius: 50%; background: var(--lp-基板); box-shadow: 0 0 6px rgba(212, 166, 58, .5); }
+h3 { color: var(--lp-ミント); }
+a { color: var(--lp-ミント); text-underline-offset: 3px; text-decoration-color: rgba(159, 227, 196, .45); }
+a:visited { color: var(--lp-ミント); }
+a:hover { color: #fff; text-decoration-color: currentColor; }
+b, strong { color: #f3fbf6; }
+.小, .sub, .meta, .仮, .代替, .一言, .日, .タイプ { color: var(--lp-副) !important; }
+.エラー, [style*="color:#b00020"], .切れ:not(.印), .停止 { color: var(--lp-誤) !important; }
+.完了, .済, .当たり { color: var(--lp-済) !important; }
+.長くかかった { color: var(--lp-注) !important; }  .早く終わった { color: var(--lp-青) !important; }
+hr { border: none; border-top: 1px solid var(--lp-線); }
+code, kbd { font-family: var(--lp-等幅); background: var(--lp-入力); border: 1px solid var(--lp-線); border-radius: 6px; padding: 0 5px; }
+
+/* ================= 3. ゲームの窓（.lp-窓）と、題の帯（.lp-題） ================= */
+.lp-窓, body.lp-スマホ #本体 {
+  position: relative;
+  margin: 16px 0 28px;
+  border: 1px solid rgba(var(--lp-色rgb), .55);
+  border-radius: var(--lp-角);
+  background:
+    linear-gradient(180deg, rgba(13, 59, 42, .92), rgba(8, 31, 22, .94) 220px, rgba(7, 27, 19, .95));
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, .6),
+    0 0 22px rgba(var(--lp-色rgb), .16),
+    0 18px 40px rgba(0, 0, 0, .45),
+    inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+/* 四隅のねじ穴（街の絵の、板の四隅と同じ） */
+.lp-窓::after, body.lp-スマホ #本体::after {
+  content: ""; position: absolute; inset: 7px; pointer-events: none; border-radius: 9px;
+  background:
+    radial-gradient(circle, #0a1a12 2px, rgba(201, 204, 196, .55) 2.6px, transparent 3.4px) top left / 10px 10px no-repeat,
+    radial-gradient(circle, #0a1a12 2px, rgba(201, 204, 196, .55) 2.6px, transparent 3.4px) top right / 10px 10px no-repeat,
+    radial-gradient(circle, #0a1a12 2px, rgba(201, 204, 196, .55) 2.6px, transparent 3.4px) bottom left / 10px 10px no-repeat,
+    radial-gradient(circle, #0a1a12 2px, rgba(201, 204, 196, .55) 2.6px, transparent 3.4px) bottom right / 10px 10px no-repeat;
+}
+.lp-題 {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  min-height: 52px; padding: 10px 22px 10px 24px;
+  border-bottom: 1px solid rgba(var(--lp-色rgb), .45);
+  border-radius: var(--lp-角) var(--lp-角) 0 0;
+  background:
+    linear-gradient(90deg, rgba(var(--lp-色rgb), .20), rgba(var(--lp-色rgb), .04) 55%, transparent),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 3px);
+}
+.lp-題 h1, .lp-題 .lp-名 { margin: 0; font-size: 19px; line-height: 1.3; color: #fff; text-shadow: 0 0 12px rgba(var(--lp-色rgb), .45); }
+/* 題の左の、光る小さな部品（LED） */
+.lp-題 h1::before, .lp-題 .lp-名::before {
+  content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 10px; vertical-align: 2px;
+  border-radius: 3px; background: var(--lp-色); box-shadow: 0 0 8px rgba(var(--lp-色rgb), .9), 0 0 2px #fff inset;
+  animation: lp-灯る 3.6s ease-in-out infinite;
+}
+/* 地区の札（右上の小さな名前） */
+.lp-地区 {
+  margin-left: auto; padding: 3px 10px; border-radius: 999px;
+  font: 600 11px/1.4 var(--lp-等幅); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
+  color: var(--lp-色); border: 1px solid rgba(var(--lp-色rgb), .5); background: rgba(0, 0, 0, .3);
+}
+/* 道（ほかの画面へのリンク）：題の帯の下の、メニューの列 */
+.lp-道 {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 20px; font-size: 0;
+  border-bottom: 1px solid var(--lp-線); background: rgba(0, 0, 0, .22);
+}
+.lp-道 a, .lp-道 > span {
+  display: inline-flex; align-items: center; min-height: 30px; padding: 2px 11px; border-radius: 8px;
+  font-size: 13px !important; text-decoration: none; color: var(--lp-副) !important;
+  border: 1px solid transparent; background: rgba(13, 59, 42, .55);
+}
+.lp-道 a:hover, .lp-道 a:focus-visible { color: #fff !important; border-color: rgba(var(--lp-色rgb), .6); background: rgba(var(--lp-色rgb), .12); }
+.lp-道 > span { background: none; padding: 2px 4px; }
+.lp-中 { padding: 6px 24px 24px; }
+.lp-中 > :first-child { margin-top: 14px; }
+.lp-中 > h2:first-child { margin-top: 18px; }
+
+@keyframes lp-灯る { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+/* ================= 4. ボタン（光る部品） ================= */
+button, input[type="button"], input[type="submit"] {
+  box-sizing: border-box; font-family: inherit; color: var(--lp-文字); cursor: pointer;
+  min-height: var(--lp-押す高);
+  border: 1px solid #2f8a63; border-radius: var(--lp-角小);
+  background: linear-gradient(180deg, #17503b, #0f3628);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 2px 0 rgba(0, 0, 0, .35);
+  transition: border-color .15s, box-shadow .15s, background .15s, transform .05s;
+}
+button:hover:not(:disabled) {
+  border-color: rgba(var(--lp-色rgb), .9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 0 0 1px rgba(var(--lp-色rgb), .35), 0 0 14px rgba(var(--lp-色rgb), .35);
+}
+button:active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 2px 4px rgba(0, 0, 0, .4); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+/* 選ばれている・主な一手：金に光る */
+button.選ばれ, button.濃, button.lp-主, button[aria-pressed="true"],
+.状態 button.選ばれ, .選択 button.選ばれ, .切替 button.選ばれ {
+  color: #1d1503 !important; font-weight: 700; border-color: var(--lp-金明) !important;
+  background: linear-gradient(180deg, #f2cd68, #c9952c) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), 0 0 14px rgba(255, 211, 107, .4) !important;
+}
+button.lp-主 { padding-left: 26px; padding-right: 26px; }
+/* 前からある、場所ごとの白いボタンの決まりを、街の色に */
+.選択 button, .状態 button, .行ボタン button, button.押す, .反応 button, .切替 button {
+  color: var(--lp-文字); border: 1px solid #2f8a63; background: linear-gradient(180deg, #17503b, #0f3628);
+}
+.状態 .行 button { margin: 2px 4px 2px 0; }
+.語 button { min-height: 0; border: none !important; background: none !important; box-shadow: none !important; color: var(--lp-副); }
+.語 button:hover { color: var(--lp-誤); }
+
+/* ================= 5. 入力欄 ================= */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]),
+select, textarea {
+  box-sizing: border-box; font-family: inherit; color: var(--lp-文字);
+  background: var(--lp-入力);
+  border: 1px solid var(--lp-線明); border-radius: 9px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .45);
+  transition: border-color .15s, box-shadow .15s;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]),
+select { min-height: var(--lp-押す高); }
+input::placeholder, textarea::placeholder { color: #6f9483; opacity: 1; }
+input:hover, select:hover, textarea:hover { border-color: rgba(var(--lp-色rgb), .6); }
+input:focus, select:focus, textarea:focus, button:focus { outline: none; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, input:focus, select:focus, textarea:focus {
+  border-color: var(--lp-色);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .45), 0 0 0 3px rgba(var(--lp-色rgb), .35), 0 0 16px rgba(var(--lp-色rgb), .25);
+}
+input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible, input[type="range"]:focus-visible {
+  outline: 2px solid var(--lp-色); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--lp-色); outline-offset: 2px; }
+input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--lp-金); }
+select option { background: #0c2a1e; color: var(--lp-文字); }
+label { color: var(--lp-副); font-weight: 600; letter-spacing: .02em; }
+/* スマホでは 16px（iPhone で拡大されないように） */
+@media (max-width: 700px), (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px !important; }
+}
+
+/* ================= 6. 中の枠（カード） ================= */
+.カード, .箱, .部屋, .状態, .問い, details, #説明, #絵, .プレビュー, .panel, .survey, #msgs, [data-頁="棚"] .行 {
+  color: var(--lp-文字);
+  background: linear-gradient(180deg, rgba(15, 51, 37, .85), rgba(9, 34, 24, .85)) !important;
+  border: 1px solid var(--lp-線) !important;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 4px 14px rgba(0, 0, 0, .25);
+}
+.カード:hover, .部屋:hover { border-color: rgba(var(--lp-色rgb), .45) !important; }
+a.部屋 { color: var(--lp-文字) !important; }
+a.部屋:hover { box-shadow: 0 0 0 1px rgba(var(--lp-色rgb), .3), 0 0 18px rgba(var(--lp-色rgb), .18); }
+.部屋 b { color: var(--lp-色); }
+.問い { border-style: dashed !important; border-color: rgba(var(--lp-色rgb), .45) !important; }
+.一手 { color: #fff; text-shadow: 0 0 14px rgba(var(--lp-色rgb), .35); }
+.時間 { color: var(--lp-色); text-shadow: 0 0 18px rgba(var(--lp-色rgb), .55); font-family: var(--lp-等幅); }
+details details { background: none !important; border: none !important; border-left: 2px solid var(--lp-線) !important; box-shadow: none; border-radius: 0; }
+summary { color: var(--lp-文字); }
+summary::marker { color: var(--lp-色); }
+.固定 { color: var(--lp-副) !important; background: var(--lp-入力) !important; border: 1px solid var(--lp-線); }
+.プレビュー { border-color: rgba(212, 166, 58, .6) !important; }
+.変わった { background: rgba(212, 166, 58, .28) !important; color: #fff; }
+.ボタン例 { color: var(--lp-文字); background: var(--lp-面2) !important; border-color: var(--lp-線明) !important; }
+.カード.合う { border-color: var(--lp-金) !important; box-shadow: 0 0 0 1px rgba(212, 166, 58, .35), 0 0 16px rgba(212, 166, 58, .18); }
+.題 { color: #fff !important; }
+.題:hover { color: var(--lp-色) !important; }
+.印 { color: #1d1503; background: var(--lp-金明) !important; }
+.語 { color: var(--lp-文字); background: var(--lp-面2) !important; border-color: var(--lp-線明) !important; }
+/* 機能の棚の印 */
+.解放済み { color: var(--lp-済) !important; background: var(--lp-済地) !important; border-color: rgba(143, 230, 168, .5) !important; }
+.未解放 { color: var(--lp-副) !important; background: rgba(255, 255, 255, .05) !important; border-color: var(--lp-線明) !important; }
+.停止 { background: var(--lp-誤地) !important; border-color: rgba(255, 143, 128, .5) !important; }
+/* メモ・タスクの行 */
+.メモ, .タスク行, .行 { border-color: var(--lp-線) !important; }
+/* 筋トレの灯 */
+.灯 { background: #1c3a2e; box-shadow: inset 0 0 0 1px var(--lp-線明); }
+.灯.点 { background: #ff9a5f; box-shadow: 0 0 8px #ffb98f; }
+/* 街の地図・エルピーの一言 */
+.一言 b { color: var(--lp-ミント); }
+[data-頁="街"] .一言 { color: var(--lp-文字) !important; background: rgba(5, 23, 15, .8); border: 1px solid rgba(var(--lp-色rgb), .35); }
+
+/* ================= 7. 表 ================= */
+table { border-color: var(--lp-線); }
+td, th { border-color: var(--lp-線) !important; }
+th { color: var(--lp-副); background: rgba(13, 59, 42, .6) !important; font-weight: 600; }
+tr:hover > td { background-color: rgba(var(--lp-色rgb), .05); }
+/* カレンダー（時刻盤） */
+[data-頁="暦"] td { background: rgba(9, 34, 24, .85); }
+[data-頁="暦"] td.空 { background: rgba(0, 0, 0, .25); }
+[data-頁="暦"] td.選択 { background: rgba(var(--lp-色rgb), .16); }
+[data-頁="暦"] td.今日 { outline-color: var(--lp-金明); box-shadow: inset 0 0 12px rgba(255, 211, 107, .25); }
+[data-頁="暦"] th { background: none !important; }
+[data-頁="暦"] th:first-child { color: #ff9f94; }  [data-頁="暦"] th:last-child { color: var(--lp-青); }
+[data-頁="暦"] .印 { color: #ffe6a8; background: rgba(212, 166, 58, .28) !important; border: 1px solid rgba(212, 166, 58, .5); }
+[data-頁="暦"] .印.切れ { color: #ffd0c9; background: rgba(255, 107, 91, .28) !important; border-color: rgba(255, 107, 91, .6); }
+.操作 b { color: var(--lp-色); font-family: var(--lp-等幅); text-shadow: 0 0 10px rgba(var(--lp-色rgb), .4); }
+
+/* ================= 8. 通信（吹き出し） ================= */
+.b { background: #143a2c !important; border: 1px solid var(--lp-線); }
+.me .b { background: #1d4a38 !important; border-color: rgba(var(--lp-色rgb), .35); }
+.ai { color: var(--lp-ミント) !important; }
+#ask button { min-height: 36px; border-radius: 999px; }
+
+/* ================= 9. スマホ版（index.html） ================= */
+body.lp-スマホ { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+body.lp-スマホ main { padding-top: 14px; }
+body.lp-スマホ #本体 { margin: 0 0 18px; padding: 0 16px 18px; }
+body.lp-スマホ #本体 > h1:first-of-type { margin-top: 14px; }
+/* 窓の題の帯：いま開いている画面の地区（下のタブの「今」から決める。CSS だけ） */
+body.lp-スマホ #本体::before {
+  content: var(--lp-札, "LUMINA PALACE ・ 街"); display: block; margin: 0 -16px 4px; padding: 10px 16px 9px 40px;
+  font: 600 11px/1.4 var(--lp-等幅); letter-spacing: .14em; color: var(--lp-色);
+  border-bottom: 1px solid rgba(var(--lp-色rgb), .45); border-radius: var(--lp-角) var(--lp-角) 0 0;
+  background:
+    radial-gradient(circle at 25px 50%, var(--lp-色) 3.5px, rgba(var(--lp-色rgb), .35) 5px, transparent 8px),
+    linear-gradient(90deg, rgba(var(--lp-色rgb), .20), rgba(var(--lp-色rgb), .03) 60%, transparent);
+}
+body.lp-スマホ:has(#タブ button.今[onclick="移る('提案')"]),
+body.lp-スマホ:has(#タブ button.今[onclick="移る('タスク')"]) { --lp-色: #ffd36b; --lp-色rgb: 255, 211, 107; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('提案')"]) { --lp-札: "LANTERN PIER ・ 港"; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('タスク')"]) { --lp-札: "LANTERN PIER ・ 荷の受付"; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('エルピー')"]) { --lp-札: "LUMINA PALACE ・ エルピーの窓"; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('街')"]) { --lp-札: "LUMINA PALACE ・ 街の地図"; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('筋トレ')"]) { --lp-札: "TRAINING YARD ・ 鍛錬場"; --lp-色: #ffab73; --lp-色rgb: 255, 171, 115; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('使った')"]) { --lp-札: "LINK PLAZA ・ 記録の塔"; --lp-色: #9fe3c4; --lp-色rgb: 159, 227, 196; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('カレンダー')"]) { --lp-札: "LINK PLAZA ・ 時刻盤"; --lp-色: #9fe3c4; --lp-色rgb: 159, 227, 196; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('メモ')"]) { --lp-札: "LUNE PASSAGE ・ 遊歩道"; --lp-色: #d6c8ff; --lp-色rgb: 214, 200, 255; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('預ける')"]) { --lp-札: "LORE PAGES ・ 図書館"; --lp-色: #9fbcf5; --lp-色rgb: 159, 188, 245; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('引く')"]) { --lp-札: "LORE PAGES ・ 書庫"; --lp-色: #9fbcf5; --lp-色rgb: 159, 188, 245; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('夜')"]) { --lp-札: "LUNAR POOL ・ ほとりの灯籠"; --lp-色: #5fd0e6; --lp-色rgb: 95, 208, 230; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('状態')"]) { --lp-札: "LUNAR POOL ・ 池"; --lp-色: #5fd0e6; --lp-色rgb: 95, 208, 230; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('ニュース')"]) { --lp-札: "LOUD PAVILION ・ 外界放送"; --lp-色: #e59cff; --lp-色rgb: 229, 156, 255; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('倉庫')"]) { --lp-札: "LOOP PIT ・ 買取所"; --lp-色: #b7c6d6; --lp-色rgb: 183, 198, 214; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('通信')"]) { --lp-札: "LINE PORT ・ 灯台"; --lp-色: #6fd3f7; --lp-色rgb: 111, 211, 247; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('同期')"]) { --lp-札: "LINE PORT ・ 双子の街への光"; --lp-色: #6fd3f7; --lp-色rgb: 111, 211, 247; }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('実験室')"]) { --lp-札: "LINK PLAZA B1 ・ 反応室"; --lp-色: #ff9fc4; --lp-色rgb: 255, 159, 196; }
+/* 下のタブ（街の道路の、光る札） */
+body.lp-スマホ nav#タブ {
+  background: linear-gradient(180deg, rgba(10, 31, 22, .94), rgba(5, 17, 11, .98)) !important;
+  border-top: 1px solid rgba(212, 166, 58, .55) !important;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, .5);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  scrollbar-width: none;
+}
+body.lp-スマホ nav#タブ::-webkit-scrollbar { display: none; }
+body.lp-スマホ nav#タブ button {
+  min-height: 56px; border: none; border-radius: 0; background: none !important; box-shadow: none !important;
+  color: var(--lp-副); font-size: 12px; border-top: 3px solid transparent; transform: none;
+}
+body.lp-スマホ nav#タブ button.今 {
+  color: var(--lp-金明); font-weight: 700; border-top: 3px solid var(--lp-金明); margin-top: -1px;
+  background: linear-gradient(180deg, rgba(255, 211, 107, .16), transparent) !important;
+  text-shadow: 0 0 10px rgba(255, 211, 107, .55);
+}
+/* スマホ版の、文の中の色（前の白い画面用の色を、置き換える） */
+body.lp-スマホ [style*="background:#f4f1ea"] { background: #143a2c !important; border: 1px solid var(--lp-線); }
+body.lp-スマホ [style*="background:#eef3f8"] { background: #1d4a38 !important; border: 1px solid rgba(var(--lp-色rgb), .35); }
+body.lp-スマホ a[style*="color:#222"] { color: #fff !important; }
+body.lp-スマホ [style*="color:#777"] { color: var(--lp-副) !important; }
+body.lp-スマホ i[style*="background:#222"] { background: #fff !important; box-shadow: 0 0 6px #fff; }
+body.lp-スマホ [style*="background:#ddd"] { background: #1c3a2e !important; }
+body.lp-スマホ [style*="background:#777"] { background: var(--lp-ミント) !important; }
+body.lp-スマホ td[style*="border:1px solid #eee"] { border-color: var(--lp-線) !important; background: rgba(9, 34, 24, .85); }
+body.lp-スマホ td[style*="background:#fff1d6"] { background: rgba(var(--lp-色rgb), .18) !important; }
+body.lp-スマホ td[style*="outline:2px solid #e08a1e"] { outline-color: var(--lp-金明) !important; }
+body.lp-スマホ [style*="background:#f6d9a8"] { color: #ffe6a8; background: rgba(212, 166, 58, .3) !important; }
+body.lp-スマホ [style*="background:#f3b6b0"] { color: #ffd0c9; background: rgba(255, 107, 91, .3) !important; }
+
+/* ================= 10. 窓の中の、狭い画面 ================= */
+@media (max-width: 640px) {
+  .lp-窓 { margin: 10px -4px 20px; }
+  .lp-題 { padding: 10px 16px 10px 22px; min-height: 48px; gap: 6px 10px; }
+  .lp-題 h1 { font-size: 17px; }
+  .lp-地区 { margin-left: 0; font-size: 10px; }
+  .lp-道 { padding: 8px 12px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .lp-道::-webkit-scrollbar { display: none; }
+  .lp-道 a { flex: 0 0 auto; white-space: nowrap; }
+  .lp-道 a { min-height: 40px; }
+  .lp-中 { padding: 4px 14px 18px; }
+}
+
+/* ================= 11. スクロールバー ================= */
+* { scrollbar-color: #2f6b52 rgba(0, 0, 0, .2); scrollbar-width: thin; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, .25); }
+::-webkit-scrollbar-thumb { background: #2a5a47; border-radius: 10px; border: 2px solid rgba(0, 0, 0, .25); }
+::-webkit-scrollbar-thumb:hover { background: #3d7a60; }
+
+/* ================= 11b. 地区の帯の絵（画像AIで作った絵。絵/地区_*.jpg。読めない時は、前の色の帯だけ） ================= */
+[data-地区="港"] { --lp-帯: url("絵/地区_港.jpg"); }
+[data-地区="広場"] { --lp-帯: url("絵/地区_広場.jpg"); }
+[data-地区="計測所"] { --lp-帯: url("絵/地区_計測所.jpg"); }
+[data-地区="楼閣"] { --lp-帯: url("絵/地区_楼閣.jpg"); }
+[data-地区="穴"] { --lp-帯: url("絵/地区_穴.jpg"); }
+[data-地区="図書館"] { --lp-帯: url("絵/地区_図書館.jpg"); }
+[data-地区="灯台"] { --lp-帯: url("絵/地区_灯台.jpg"); }
+[data-地区="遊歩道"] { --lp-帯: url("絵/地区_遊歩道.jpg"); }
+[data-地区="池"] { --lp-帯: url("絵/地区_池.jpg"); }
+[data-地区="制御室"] { --lp-帯: url("絵/地区_制御室.jpg"); }
+[data-地区="反応室"] { --lp-帯: url("絵/地区_反応室.jpg"); }
+[data-地区="鍛錬場"] { --lp-帯: url("絵/地区_鍛錬場.jpg"); }
+[data-地区="街"] { --lp-帯: url("絵/地区_街.jpg"); }
+.lp-題 {
+  min-height: 108px; align-items: flex-end;
+  background:
+    linear-gradient(90deg, rgba(4, 14, 9, .9), rgba(4, 14, 9, .55) 50%, rgba(4, 14, 9, .12)),
+    linear-gradient(0deg, rgba(4, 14, 9, .75), transparent 60%),
+    linear-gradient(90deg, rgba(var(--lp-色rgb), .20), rgba(var(--lp-色rgb), .04) 55%, transparent),
+    var(--lp-帯, linear-gradient(transparent, transparent)) center 62% / cover no-repeat, #0a1f16;
+}
+body.lp-スマホ:has(#タブ button.今[onclick="移る('提案')"]) { --lp-帯: url("絵/地区_港.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('タスク')"]) { --lp-帯: url("絵/地区_港.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('エルピー')"]) { --lp-帯: url("絵/地区_街.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('街')"]) { --lp-帯: url("絵/地区_街.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('筋トレ')"]) { --lp-帯: url("絵/地区_鍛錬場.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('使った')"]) { --lp-帯: url("絵/地区_広場.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('カレンダー')"]) { --lp-帯: url("絵/地区_広場.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('メモ')"]) { --lp-帯: url("絵/地区_遊歩道.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('預ける')"]) { --lp-帯: url("絵/地区_図書館.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('引く')"]) { --lp-帯: url("絵/地区_図書館.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('夜')"]) { --lp-帯: url("絵/地区_池.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('状態')"]) { --lp-帯: url("絵/地区_池.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('ニュース')"]) { --lp-帯: url("絵/地区_楼閣.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('倉庫')"]) { --lp-帯: url("絵/地区_穴.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('通信')"]) { --lp-帯: url("絵/地区_灯台.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('同期')"]) { --lp-帯: url("絵/地区_灯台.jpg"); }
+body.lp-スマホ:has(#タブ button.今[onclick="移る('実験室')"]) { --lp-帯: url("絵/地区_反応室.jpg"); }
+body.lp-スマホ #本体::before {
+  padding-top: 64px;
+  background:
+    radial-gradient(circle at 25px calc(100% - 17px), var(--lp-色) 3.5px, rgba(var(--lp-色rgb), .35) 5px, transparent 8px),
+    linear-gradient(0deg, rgba(4, 14, 9, .92), rgba(4, 14, 9, .2) 75%),
+    linear-gradient(90deg, rgba(var(--lp-色rgb), .20), rgba(var(--lp-色rgb), .03) 60%, transparent),
+    var(--lp-帯, linear-gradient(transparent, transparent)) center 62% / cover no-repeat, #0a1f16;
+}
+@media (max-width: 640px) { .lp-題 { min-height: 84px; } }
+
+/* ================= 12. 動きを減らす設定 ================= */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+}

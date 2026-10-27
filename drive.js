@@ -25,7 +25,7 @@
     if (!r.ok) throw new Error("ドライブとの通信に失敗しました（" + r.status + "）");
     return r;
   }
-  const 探す = async (トークン, 条件) => ((await (await 呼ぶ(トークン, 基 + "/files?q=" + encodeURIComponent(条件 + " and trashed=false") + "&fields=files(id,name)&spaces=drive")).json()).files || []);
+  const 探す = async (トークン, 条件) => ((await (await 呼ぶ(トークン, 基 + "/files?q=" + encodeURIComponent(条件 + " and trashed=false") + "&fields=files(id,name)&spaces=drive&orderBy=" + encodeURIComponent("modifiedTime desc"))).json()).files || []);
   async function フォルダを用意する(トークン) {
     const 既 = await 探す(トークン, "name='" + フォルダ名 + "' and mimeType='application/vnd.google-apps.folder'");
     if (既.length) return 既[0].id;

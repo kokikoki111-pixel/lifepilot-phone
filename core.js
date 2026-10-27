@@ -28,7 +28,7 @@
     let 緊急 = 0.0;
     if (タスク.種類 === "締切") {
       const 残り日 = (締切の日時(タスク.締切) - 今) / 1000 / 86400;
-      if (残り日 <= 0) 緊急 = 重要度 * 重み.期限切れの倍率;
+      if (残り日 <= 0 && !重み.期限切れは直前と同じ) 緊急 = 重要度 * 重み.期限切れの倍率;     // 期限切れは、直前と同じ（設定で、前の決まりにも戻せる）
       else {
         緊急 = 重要度 / Math.max(残り日, 重み.残り日数の下限);
         if (残り日 <= 重み.期限が近い日数) 緊急 *= 重み.期限が近い時の追加倍率;
@@ -315,8 +315,9 @@
   }
   // 既存のLP予定（Googleから読んだ物）と、望む予定の差。過去の予定は、直さない・消さない
   function 予定の差(望む, 既存, 今 = new Date()) {
-    const 持つ = new Map(); for (const e of 既存) { const p = (e.extendedProperties || {}).private || {}; if (p.lifepilot === "1" && p.lpkey) 持つ.set(p.lpkey, e); }
+    const 持つ = new Map(), 重複 = []; for (const e of 既存) { const p = (e.extendedProperties || {}).private || {}; if (p.lifepilot === "1" && p.lpkey) { if (持つ.has(p.lpkey)) 重複.push(e); else 持つ.set(p.lpkey, e); } }
     const 作る = [], 直す = [], 消す = [], 望むキー = new Set(望む.map(x => x.キー));
+    for (const e of 重複) { const 始 = new Date((e.start || {}).dateTime || (e.start || {}).date || 0); if (始 >= 今) 消す.push({ id: e.id, キー: e.extendedProperties.private.lpkey }); }
     for (const x of 望む) { const e = 持つ.get(x.キー); if (!e) 作る.push(x); else if (e.extendedProperties.private.h !== x.本体.extendedProperties.private.h) 直す.push({ id: e.id, 予定: x }); }
     for (const [キー, e] of 持つ) { if (望むキー.has(キー)) continue; const 始 = new Date((e.start || {}).dateTime || (e.start || {}).date || 0); if (始 >= 今) 消す.push({ id: e.id, キー }); }
     return { 作る, 直す, 消す };
@@ -452,6 +453,19 @@
     const 候補 = 質問 ? s.質問[質問][相手] : s.困った時[相手];
     return { 本文: 候補[Math.floor(乱() * 候補.length)].split("{状況}").join(状況), 出所: 質問 || "自由" };
   }
+  // スマホの AI：自由な言葉は「返事待ち」にして、同期で Mac の AI が返事を書く（Mac 版の V1_スマホへの返事.py）
+  function AIの依頼を足す(データ, 相手, 文, 状況, 履歴 = [], 今 = new Date()) {
+    データ.ai_requests = データ.ai_requests || [];
+    const r = 更新印({ id: 新しいid(データ.ai_requests), 日時: 時刻文字(今), 相手, 文: (文 || "").trim(), 状況, 履歴: 履歴.slice(-6) }, 今);
+    データ.ai_requests.push(r); return r;
+  }
+  function 届いた返事(データ, 見た = []) {         // まだ通信に出していない、AI の返事（本文のある物だけ）
+    const 済 = new Set(見た); return 生きた一覧(データ.ai_replies).filter(r => r.由来 === "AI" && r.本文 && !済.has(r.id));
+  }
+  // 通信の絵の表情：最後に来た通信の出所から（達成は笑顔、命令は真剣、締切切れは困り）
+  function 通信の表情(出所) {
+    return ({ 達成: "笑顔", 筋トレ: "笑顔", 朝: "笑顔", 五分: "真剣", 放置: "真剣", 筋トレの間: "真剣", 締切切れ: "困り", 専門窓口: "真剣" })[出所] || "ふつう";
+  }
   function 節目の文(設定, キー, 状況, 乱 = Math.random) {
     const e = 設定.通信.節目[キー]; if (!e) throw new Error("その節目はありません");
     return { 送り手: e.送り手, 本文: e.文[Math.floor(乱() * e.文.length)].split("{状況}").join(状況), 出所: キー, 名: e.名 };
@@ -567,7 +581,7 @@
     const r = 更新印({ id: 新しいid(データ.seals), 封じた日時: 時刻文字(今), 対象日: 日付文字(対象), タスクid, 状態: "封中" }, 今); データ.seals.push(r); return r;
   }
   function 封をやめる(データ, 今 = new Date()) { let n = 0; for (const r of データ.seals) if (r.状態 === "封中") { r.状態 = "やめた"; 更新印(r, 今); n++; } return n; }
-  const 今の封 = データ => データ.seals.find(r => r.状態 === "封中") || null;
+  const 今の封 = データ => データ.seals.filter(r => r.状態 === "封中").reduce((a, r) => (!a || r.封じた日時 > a.封じた日時) ? r : a, null);   // 同期で2つになったら、新しい方
   function 今日の封印(データ, 今 = new Date()) {
     const r = 今の封(データ); if (!r || r.対象日 !== 日付文字(今)) return null;
     const タスク = 生きている(データ.tasks).filter(t => !t.倉庫).find(t => t.id === r.タスクid); return タスク ? Object.assign({}, r, { タスク }) : null;
@@ -682,7 +696,9 @@
     for (const t of タスク) {
       if (t.種類 === "締切" && !t.倉庫) {
         const 切れ = 締切の日時(t.締切);
-        if (切れ <= 今 && 日付文字(切れ) >= 開始 && 出来事を書く(データ, "締切切れ", 切れ, { 番号: "締切切れ-" + t.id, 理由: "締切切れ：" + t.内容 })) 報告.締切切れ++;
+        const 旧 = データ.life_events.find(r => r.id === "締切切れ-" + t.id);     // 前の形の番号（締切つきでない）
+        if (旧 && 旧.日付 === 日付文字(切れ)) continue;
+        if (切れ <= 今 && 日付文字(切れ) >= 開始 && 出来事を書く(データ, "締切切れ", 切れ, { 番号: "締切切れ-" + t.id + "-" + 締切を整える(t.締切), 理由: "締切切れ：" + t.内容 })) 報告.締切切れ++;
       }
     }
     for (let ms = 日の値(開始); ; ms += 86400000) {
@@ -718,18 +734,148 @@
              睡眠の質問: !今日の答え.length, 今日の睡眠: 今日の答え.length ? 今日の答え[0].時間 : null };
   }
 
+  // ---------- AIコーチ 役1「苦手の克服」：理由から、小さい最初の一手（Mac 版の A4.最初の一手の文 と同じ決まり） ----------
+  function 最初の一手(タスク, 反応, 理由, 自由記述, 設定) {
+    const c = ((設定 || {}).コーチ || {}).最初の一手;
+    if ((反応 !== "今やらない" && 反応 !== "今日はやらない") || !タスク || !c || !c.使う) return null;
+    let 文;
+    if ((理由 === "やりたくない" || 理由 === "気分じゃない") && (タスク.見積もり分 || 0) >= c.大きいとみなす分) 文 = c.大きい時;
+    else { const キー = 理由 || ((自由記述 || "").trim() ? "自分の言葉" : null); 文 = キー ? c.理由ごと[キー] : null; }
+    return 文 ? 文.split("{タスク}").join(タスク.内容) : null;
+  }
+  // ---------- AIコーチ 役4「自由コーチ」：筋トレ（Mac 版の Z1_筋トレ.py と同じ決まり）。声かけと世界観だけ。数字の評価はしない ----------
+  function 筋トレの様子(記録, s, 今 = new Date(), 最後に促した = null) {
+    const 今日 = 日付文字(今), 週の始め = 日付文字(new Date(今.getFullYear(), 今.getMonth(), 今.getDate() - (今.getDay() + 6) % 7));
+    const 日 = Array.from(new Set(生きた一覧(記録).map(r => r.日付).filter(d => d <= 今日))).sort();
+    const 今週 = 日.filter(d => d >= 週の始め).length, 最後 = 日.length ? 日[日.length - 1] : null;
+    const 空いた日数 = 最後 ? 日数の差(今, 最後) : null;
+    const 空いた = !!(s.使う && 空いた日数 !== null && 空いた日数 >= s.空いたとみなす日数);
+    const 促す = 空いた && (!最後に促した || 最後に促した.slice(0, 10) <= 最後);
+    return { 今週, 目標: s.週の回数, 最後, 空いた日数, 空いた, 促す };
+  }
+  function 筋トレをやった(データ, 設定, メモ = "", 今 = new Date()) {
+    const s = 設定.自由コーチ.筋トレ; if (!s.使う) throw new Error("筋トレのコーチは、設定で切ってあります");
+    メモ = (メモ || "").trim(); if (メモ.length > 100) throw new Error("メモは100文字までです");
+    データ.workout_logs = データ.workout_logs || [];
+    const r = 更新印({ id: 新しいid(データ.workout_logs), 日時: 時刻文字(今), 日付: 日付文字(今), 分: s.分, メモ }, 今); データ.workout_logs.push(r);
+    出来事を書く(データ, "達成", 今, { 理由: "筋トレをやった" }); return r;
+  }
+  function 筋トレを取り消す(データ, 番号, 今 = new Date()) {
+    const r = (データ.workout_logs || []).find(x => x.id === 番号 && !x.削除); if (!r) throw new Error("その記録はありません");
+    削除印(r, 今);
+  }
+  // ---------- 記録を引く（柱B ③-1。Mac 版の D3_記録を引く.py と同じ決まり。AIは使わない） ----------
+  function 記録を引く(データ, 言葉 = "", 開始日 = null, 終了日 = null, 種類 = null) {
+    const 日付か = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ""); if (!m) return false; const d = new Date(+m[1], +m[2] - 1, +m[3]); return d.getMonth() === +m[2] - 1 && d.getDate() === +m[3]; };
+    for (const 日 of [開始日, 終了日]) if (日 && !日付か(日)) throw new Error("日付は、半角の 2026-10-21 の形で書いてください");
+    if (開始日 && 終了日 && 開始日 > 終了日) throw new Error("開始日が、終了日より後になっています");
+    const 語 = (言葉 || "").split("　").join(" ").split(" ").filter(w => w);
+    return 生きている(データ.deposits).filter(r => {
+      const 日 = r.日付.slice(0, 10);
+      return !(開始日 && 日 < 開始日) && !(終了日 && 日 > 終了日) && !(種類 && r.種類 !== 種類) && 語.every(w => r.本文.includes(w));
+    }).sort((a, b) => (a.日付 < b.日付 ? 1 : a.日付 > b.日付 ? -1 : 0));
+  }
+  // ---------- 街の地図（小説の世界ルミナ・パレス。Mac 版の Y1_街.py と同じ決まり。絵は、Mac とスマホで共通） ----------
+  // 補足：{ ニュース: 反応していない見出しの数, 同期: "YYYY-MM-DD HH:MM:SS" か null }（スマホでは、端末の中の物から渡す）
+  function 街の材料(データ, 設定, 今 = new Date(), 補足 = {}) {
+    const 状 = 生活の状態(データ, 設定, 今);
+    return { 点数: 状.点数, 疲れ: 状.疲れ, 出来事: 生きた一覧(データ.life_events), タスク: 生きている(データ.tasks).filter(t => !t.倉庫),
+             箱: 箱の中身(データ, 今).length, メモ: 生きた一覧(データ.memos).length, ニュース: 補足.ニュース || 0, 同期: 補足.同期 || null, 筋トレ: 筋トレの材料(データ, 設定, 今) };
+  }
+  function 筋トレの材料(データ, 設定, 今) {
+    const s = (設定.自由コーチ || {}).筋トレ; if (!s || !s.使う) return null;
+    const x = 筋トレの様子(データ.workout_logs || [], s, 今); return { 今週: x.今週, 目標: x.目標, 空いた: x.空いた, 空いた日数: x.空いた日数 };
+  }
+  function 街の様子(材料, 設定, 今 = new Date()) {
+    const s = 設定.街, 今日 = 日付文字(今), 始 = 日付文字(new Date(今.getFullYear(), 今.getMonth(), 今.getDate() - (s.集計日数 - 1)));
+    const 灯 = 材料.出来事.filter(r => (r.種 === "達成" || r.種 === "五分") && 始 <= r.日付 && r.日付 <= 今日).length;
+    const 放置 = [], 切れ = [], 鐘 = [];
+    for (const t of 材料.タスク) {
+      if (日数の差(今, t.最後に触った日) >= s.霧の放置日数) 放置.push(t.内容);
+      if (t.種類 === "締切" && t.締切) {
+        const 残り = (締切の日時(t.締切) - 今) / 3600000;
+        if (残り <= 0) 切れ.push(t.内容); else if (残り <= s.鐘の時間) 鐘.push(t.内容);
+      }
+    }
+    let 灯台 = null;
+    if (材料.同期) { const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(材料.同期); if (m) 灯台 = (今 - new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])) / 1000 <= s.灯台の日数 * 86400; }
+    const [種, n] = 切れ.length ? ["クラッシュ", 切れ.length] : 鐘.length ? ["鐘", 鐘.length] : 放置.length >= s.霧を言う数 ? ["霧", 放置.length]
+                  : 材料.疲れ >= s.池が濁る疲れ ? ["池", 0] : (材料.筋トレ && 材料.筋トレ.空いた) ? ["筋トレ", 材料.筋トレ.空いた日数] : 灯 === 0 ? ["暗い", 0] : ["ふつう", 0];
+    return { 明るさ: Math.max(0.15, Math.min(1, (材料.点数 + 100) / 200)), 灯籠: [Math.min(灯, s.灯籠の数), s.灯籠の数],
+             霧: Math.min(1, 放置.length / s.霧が満ちる数), 霧の物: 放置.slice(0, 3), 塔: 切れ.length, 塔の物: 切れ.slice(0, 3),
+             鐘: 鐘.length, 鐘の物: 鐘.slice(0, 3), 池: Math.min(1, Math.max(0, 材料.疲れ / 100)), 図書館: 材料.箱,
+             遊歩道: Math.min(材料.メモ, s.飾りの数), 楼閣: Math.min(材料.ニュース, s.映像の数), 灯台,
+             鍛錬場: 材料.筋トレ ? [材料.筋トレ.今週, 材料.筋トレ.目標] : null,
+             一言の種: 種, 一言: s.一言[種].split("{n}").join(String(n)) };
+  }
+  // 地区の説明（押した時に出す）。行き先：[名前, Mac の道, スマホの画面]
+  function 街の説明(k, 様) {
+    const 物 = a => a.length ? "（" + a.join("、") + (a.length === 3 ? "…" : "") + "）" : "";
+    return ({
+      港: { 題: "港　Lantern Pier（電源）", 文: `灯籠：${様.灯籠[0]}／${様.灯籠[1]}。達成と「5分だけ」の数だけ灯る。`, 行き先: [["今なにする？", "/suggest", "提案"]] },
+      広場: { 題: "広場　Link Plaza（CPU）", 文: 様.塔 ? `塔の面が ${様.塔} つ黒い（締切切れ）${物(様.塔の物)}。` : "塔は、全部の面が動いている。地下に反応室と制御室、そばに計測所がある。",
+              行き先: [["カレンダー", "/calendar", "カレンダー"], ["反応室（実験室）", "/lab", "実験室"], ["計測所（相場帳）", "/ledger", null], ["制御室（整備室）", "/room", null]] },
+      鐘楼: { 題: "鐘楼", 文: 様.鐘 ? `鐘が鳴っている：締切の近い物 ${様.鐘} 件${物(様.鐘の物)}。` : "鐘は静か。近い締切は、ない。", 行き先: [["カレンダー", "/calendar", "カレンダー"]] },
+      楼閣: { 題: "楼閣　Loud Pavilion（GPU）", 文: `外界放送：まだ見ていない知らせ ${様.楼閣} 件。`, 行き先: [["ニュース", "/news", "ニュース"]] },
+      穴: { 題: "穴　Loop Pit（メモリ）", 文: 様.霧 ? `霧が溜まっている：長く手付かずの物${物(様.霧の物)}。` : "霧は、ほとんど無い。", 行き先: [["倉庫", "/warehouse", "倉庫"]] },
+      池: { 題: "池　Lunar Pool（冷却）", 文: `濁り：${Math.round(様.池 * 100)}%（疲れ）。眠れば澄む。`, 行き先: [["エルピーの窓（睡眠）", "/window", "エルピー"], ["明日何やる？", "/night", "夜"]] },
+      図書館: { 題: "図書館　Lore Pages（SSD）", 文: 様.図書館 ? `返ってきた本：${様.図書館} 冊。` : "預けた本は、まだ眠っている。", 行き先: [["受け取り箱", "/inbox", "預ける"], ["預ける", "/deposit", "預ける"]] },
+      遊歩道: { 題: "遊歩道　Lune Passage（デスクトップ）", 文: `飾られた願い：${様.遊歩道} 件。`, 行き先: [["メモ", "/memo", "メモ"]] },
+      鍛錬場: { 題: "鍛錬場（筋トレ）", 文: 様.鍛錬場 ? `今週の鍛錬：${様.鍛錬場[0]}／${様.鍛錬場[1]} 日。やった日には、パイロットの姿が少し強くなる。` : "筋トレのコーチは、切ってある。",
+                行き先: [["筋トレ", "/train", "筋トレ"]] },
+      灯台: { 題: "灯台　Line Port（ネットワーク）", 文: 様.灯台 === true ? "光がついている（最近、同期した）。向こうの光と、同じ拍で瞬いている。" : 様.灯台 === false ? "光が消えている（しばらく同期していない）。" : "光の様子が、ここからは分からない。",
+              行き先: [["同期", null, "同期"]] }
+    })[k];
+  }
+  function 街を描く(様) {
+    const 安 = v => String(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const 混ぜ色 = (a, b, t) => "#" + [0, 2, 4].map(i => Math.round(parseInt(a.substr(1 + i, 2), 16) * (1 - t) + parseInt(b.substr(1 + i, 2), 16) * t).toString(16).padStart(2, "0")).join("");
+    const 明 = 様.明るさ, 道 = (0.25 + 0.6 * 明).toFixed(2);
+    const 地区 = (k, 名, x, y, 中) => `<g class="地区" data-k="${k}" tabindex="0" role="button" aria-label="${安(名)}" style="cursor:pointer">${中}<text x="${x}" y="${y}" text-anchor="middle" font-size="11" fill="#e6f2ea">${安(名)}</text></g>`;
+    const 道筋 = [[240, 331, 320, 215], ...(様.鍛錬場 ? [[158, 90, 320, 215]] : []), [320, 215, 505, 250], [320, 215, 460, 350], [320, 215, 320, 90], [320, 215, 170, 205], [505, 250, 560, 145], [320, 215, 320, 380], [320, 215, 395, 170]]
+      .map(([a, b, c, d]) => `<path d="M${a} ${b}L${(a + c) / 2} ${b}L${c} ${d}" stroke="#d4a63a" stroke-width="3" fill="none" opacity="${道}"/>`).join("");
+    const 灯籠 = Array.from({ length: 様.灯籠[1] }, (_, i) => { const x = 70 + i * (160 / Math.max(1, 様.灯籠[1] - 1)), 点 = i < 様.灯籠[0];
+      return `<line x1="${x}" y1="330" x2="${x}" y2="320" stroke="#7a6a52"/><circle cx="${x}" cy="316" r="5" fill="${点 ? "#ffd36b" : "#2d3a33"}" stroke="${点 ? "#fff1c4" : "#56665c"}"${点 ? ' filter="url(#光)"' : ""}/>`; }).join("");
+    const 面 = [0, 1, 2, 3].map(i => i < 様.塔 ? `<rect x="${303 + 9 * i}" y="156" width="6" height="68" fill="#151515" stroke="#d0453a"/>` : `<rect x="${303 + 9 * i}" y="156" width="6" height="68" fill="#9fe3c4" opacity="${(0.35 + 0.6 * 明).toFixed(2)}"/>`).join("");
+    const 鐘 = 様.鐘 ? `<circle cx="395" cy="127" r="7" fill="#ff6b5b"><animate attributeName="r" values="7;9;7" dur="1.2s" repeatCount="indefinite"/></circle><circle cx="395" cy="127" r="12" fill="none" stroke="#ff6b5b"><animate attributeName="r" values="9;22" dur="1.2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.8;0" dur="1.2s" repeatCount="indefinite"/></circle>` : `<circle cx="395" cy="127" r="7" fill="#8a9a90"/>`;
+    const 映像色 = ["#ff5fa2", "#5fd0ff", "#ffd35f", "#8dff7a", "#c58bff", "#ff9a5f"];
+    const 映像 = Array.from({ length: 6 }, (_, i) => `<rect x="${472 + 24 * (i % 3)}" y="${224 + 20 * Math.floor(i / 3)}" width="18" height="14" fill="${i < 様.楼閣 ? 映像色[i] : "#1d1830"}"/>`).join("");
+    const 本 = Array.from({ length: 6 }, (_, i) => `<rect x="${287 + 11 * i}" y="60" width="7" height="24" fill="${i < 様.図書館 ? "#ffe59a" : "#1c2638"}"${i < 様.図書館 ? ' filter="url(#光)"' : ""}/>`).join("");
+    const 窓 = Array.from({ length: 6 }, (_, i) => `<rect x="${46 + 20 * i}" y="191" width="16" height="22" fill="${i < 様.遊歩道 ? "#b8e0ff" : "#142430"}"/>${i < 様.遊歩道 ? `<circle cx="${54 + 20 * i}" cy="202" r="3" fill="#ffd36b"/>` : ""}`).join("");
+    const 灯台色 = 様.灯台 === true ? "#fff3a0" : 様.灯台 === false ? "#4a4a4a" : "#777";
+    const 光 = 様.灯台 === true ? `<polygon points="565,96 640,72 640,120" fill="#fff3a0" opacity="0.22"/><circle cx="628" cy="52" r="3" fill="#fff3a0"><animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite"/></circle>` : "";
+    return `<svg viewBox="0 0 640 440" role="img" aria-label="街の地図" style="width:100%;height:auto;display:block;border-radius:12px">
+<defs><filter id="光" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="640" height="440" fill="#0e2b20"/>
+<g opacity="0.12" stroke="#7fd1a8">${Array.from({ length: 15 }, (_, i) => `<line x1="0" y1="${i * 30}" x2="640" y2="${i * 30}"/>`).join("")}${Array.from({ length: 22 }, (_, i) => `<line x1="${i * 30}" y1="0" x2="${i * 30}" y2="440"/>`).join("")}</g>
+${道筋}
+${地区("図書館", "図書館 Lore Pages", 320, 106, `<polygon points="276,46 320,22 364,46" fill="#3a4f70"/><rect x="280" y="46" width="80" height="44" fill="#2d3f5a"/>${本}`)}
+${地区("遊歩道", "遊歩道 Lune Passage", 105, 236, `<path d="M58 172a12 12 0 1 0 10 -16a9 9 0 1 1 -10 16z" fill="#e8e3b0" opacity="0.8"/><rect x="40" y="185" width="130" height="36" fill="#263a48"/>${窓}`)}
+${地区("灯台", "灯台 Line Port", 565, 178, `${光}<polygon points="530,165 600,165 585,150 545,150" fill="#24493a"/><rect x="558" y="100" width="14" height="50" fill="#e9ecef"/><circle cx="565" cy="96" r="6" fill="${灯台色}"${様.灯台 === true ? ' filter="url(#光)"' : ""}/>`)}
+${地区("広場", "広場 Link Plaza", 320, 285, `<circle cx="320" cy="215" r="55" fill="#173d2e" stroke="#d4a63a" stroke-opacity="${道}"/><rect x="298" y="150" width="44" height="80" fill="#2a5a47"/>${面}`)}
+${地区("鐘楼", "鐘楼", 395, 195, `<rect x="388" y="132" width="14" height="50" fill="#3b5a4c"/>${鐘}`)}
+${地区("楼閣", "楼閣 Loud Pavilion", 505, 300, `<circle cx="482" cy="209" r="8" fill="none" stroke="#9aa"/><circle cx="528" cy="209" r="8" fill="none" stroke="#9aa"/><rect x="465" y="216" width="80" height="68" fill="#2b2340"/>${映像}`)}
+${地区("港", "港 Lantern Pier", 150, 372, `<rect x="40" y="334" width="220" height="26" fill="#071a14"/><rect x="60" y="328" width="180" height="7" fill="#5b4a36"/>${灯籠}`)}
+${地区("穴", "穴 Loop Pit", 460, 404, `<ellipse cx="460" cy="360" rx="70" ry="28" fill="#06120d" stroke="#3b5d4f"/><ellipse cx="460" cy="362" rx="48" ry="18" fill="none" stroke="#2c4a3e"/><ellipse cx="460" cy="364" rx="26" ry="9" fill="none" stroke="#2c4a3e"/><ellipse cx="460" cy="356" rx="76" ry="34" fill="#a3aaa6" opacity="${(様.霧 * 0.75).toFixed(2)}"/>`)}
+${地区("池", "池 Lunar Pool", 320, 428, `<ellipse cx="320" cy="398" rx="62" ry="20" fill="${混ぜ色("#2fb6d8", "#6b6f5a", 様.池)}"/><circle cx="338" cy="394" r="4" fill="#f4f1d0" opacity="${(0.8 - 0.6 * 様.池).toFixed(2)}"/>`)}
+${様.鍛錬場 ? 地区("鍛錬場", "鍛錬場", 110, 120, `<rect x="62" y="62" width="96" height="40" rx="4" fill="#3a3326" stroke="#7a6a52"/><rect x="88" y="78" width="44" height="4" fill="#b9c2bc"/><rect x="82" y="72" width="7" height="16" rx="1" fill="#b9c2bc"/><rect x="131" y="72" width="7" height="16" rx="1" fill="#b9c2bc"/>` + Array.from({ length: 様.鍛錬場[1] }, (_, i) => { const 点 = i < 様.鍛錬場[0], x = 70 + i * (80 / Math.max(1, 様.鍛錬場[1] - 1)); return `<circle cx="${x}" cy="56" r="4" fill="${点 ? "#ff9a5f" : "#2d3a33"}" stroke="${点 ? "#ffd2b8" : "#56665c"}"${点 ? ' filter="url(#光)"' : ""}/>`; }).join("")) : ""}
+<rect width="640" height="440" fill="#000" opacity="${((1 - 明) * 0.55).toFixed(2)}" pointer-events="none"/>
+</svg>`;
+  }
+
   // ---------- 同期（突き合わせ。Mac 版の H1_突き合わせ.py と同じ決まり） ----------
-  const 形式の版 = 1, 混ぜる一覧名 = ["tasks", "deposits", "state_logs", "seals", "suggestion_log", "focus_log", "memos", "life_events", "sleep_logs", "warehouse_items", "wishlist", "duration_log"];
+  const 形式の版 = 1, 混ぜる一覧名 = ["tasks", "deposits", "state_logs", "seals", "suggestion_log", "focus_log", "memos", "life_events", "sleep_logs", "warehouse_items", "wishlist", "duration_log", "workout_logs", "ai_requests", "ai_replies"];
   const 整列 = v => Array.isArray(v) ? v.map(整列) : (v && typeof v === "object") ? Object.keys(v).sort().reduce((o, k) => (o[k] = 整列(v[k]), o), {}) : v;
   const 同じ内容 = (a, b) => JSON.stringify(整列(a)) === JSON.stringify(整列(b));
   const 新しい方 = (自分, 相手) => ((相手.更新日時 || "") > (自分.更新日時 || "") ? 相手 : 自分);
   function 一覧を混ぜる(自分, 相手) {
-    const 混ぜた = new Map(自分.map(r => [r.id, r])); let 入った = 0;
+    const 混ぜた = new Map(自分.filter(r => r.id != null).map(r => [r.id, r])), id無し = 自分.filter(r => r.id == null); let 入った = 0;   // id 無しは、消さずに残し、相手からは入れない
     for (const r of 相手) {
+      if (r.id == null) continue;
       if (!混ぜた.has(r.id)) { 混ぜた.set(r.id, r); 入った++; }
       else { const 今の = 混ぜた.get(r.id), 勝つ = 新しい方(今の, r); if (勝つ === r && !同じ内容(r, 今の)) 入った++; 混ぜた.set(r.id, 勝つ); }
     }
-    return [Array.from(混ぜた.values()), 入った];
+    return [Array.from(混ぜた.values()).concat(id無し), 入った];
   }
   function 価値観を混ぜる(自分, 相手) {
     const 結果 = { 答え: Object.assign({}, 自分.答え || {}), 今日はやめた: Object.assign({}, 自分.今日はやめた || {}) }; let 入った = 0;
@@ -764,10 +910,108 @@
     const 生 = await ドライブ.読む();
     let 相手 = null;
     if (生 !== null) { try { 相手 = JSON.parse(生); } catch (e) { throw new Error("同期ファイルが、読めません（壊れているか、新しい版です）。上書きしないで、止めました"); } }
-    const 日数 = (相手 && 相手.Macから && 相手.Macから.設定 && 相手.Macから.設定.スマホ連携 && 相手.Macから.設定.スマホ連携.削除の印を本当に消すまでの日数) || 30;
+    const 日数 = (相手 && 相手.Macから && 相手.Macから.設定 && 相手.Macから.設定.スマホ連携 && 相手.Macから.設定.スマホ連携.削除の印を本当に消すまでの日数) || 365;
     const 結果 = 同期を組み立てる(データ, 相手, 日数, 今);
     await ドライブ.書く(JSON.stringify(結果.出力), 生);
     return { 新しいデータ: 結果.新しいデータ, 報告: 結果.報告, 設定: 相手 && 相手.Macから ? 相手.Macから.設定 : null, ニュース: 相手 && 相手.Macから ? 相手.Macから.ニュース : null };
+  }
+
+  // ---------- 使った機能（Mac 版の U1_使った機能.py と同じ決まり）。数えるだけ。点数・評価はしない ----------
+  // 表：[名前, [[一覧の名前, 日付の項目, 絞り]]]。絞りは [項目, "=" か "≠", 値]。一覧がデータに無い機能は出さない（Macだけの物）
+  const 使った機能の表 = [
+    ["タスクを足した", [["tasks", "作成日", []]]],
+    ["提案を見た", [["suggestion_log", "日時", []]]],
+    ["提案に反応した", [["suggestion_log", "反応の日時", []]]],
+    ["5分だけ", [["focus_log", "開始", []]]],
+    ["達成", [["life_events", "日付", [["種", "=", "達成"], ["理由", "≠", "筋トレをやった"]]]]],
+    ["預けた", [["deposits", "日付", []]]],
+    ["受け取り箱を開いた", [["deposits", "受け取った日", []]]],
+    ["明日何やる？（封）", [["seals", "封じた日時", []]]],
+    ["メモ", [["memos", "日付", []]]],
+    ["体と気分", [["state_logs", "日時", []]]],
+    ["睡眠", [["sleep_logs", "日付", []]]],
+    ["倉庫", [["warehouse_items", "置いた日", []], ["warehouse_items", "処理した日", []], ["wishlist", "置いた日", []], ["wishlist", "答えた日", []]]],
+    ["相場帳", [["duration_log", "日時", []]]],
+    ["筋トレ", [["workout_logs", "日付", []]]],
+    ["ログイン", [["life_events", "日付", [["種", "=", "ログイン"]]]]],
+    ["通信で話した", [["comm_log", "日時", [["送り手", "=", "あなた"]]]]],
+    ["実験室", [["experiments", "日付", []]]]
+  ];
+  function 使った機能の集計(データ, 今 = new Date(), 日数 = 28) {
+    const 日 = i => 日付文字(new Date(今.getFullYear(), 今.getMonth(), 今.getDate() - i));
+    const 日付 = []; for (let i = 日数 - 1; i >= 0; i--) 日付.push(日(i));
+    const 位置 = new Map(日付.map((d, i) => [d, i])), 今日 = 日(0), 七日前 = 日(6), 持つ = k => Object.prototype.hasOwnProperty.call(データ || {}, k);
+    const 合う = (r, 絞り) => 絞り.every(([項目, 比べ方, 値]) => 比べ方 === "=" ? r[項目] === 値 : 比べ方 === "≠" ? r[項目] !== 値 : true);
+    const 機能 = [];
+    for (const [名前, 元一覧] of 使った機能の表) {
+      if (!元一覧.some(([一覧]) => 持つ(一覧))) continue;
+      const 毎日 = new Array(日数).fill(0); let 最後 = null;
+      for (const [一覧, 項目, 絞り] of 元一覧) for (const r of (データ[一覧] || [])) {
+        if (!r || typeof r !== "object" || Array.isArray(r) || r.削除 || !合う(r, 絞り)) continue;
+        const v = r[項目]; if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(v)) continue;
+        const d = v.slice(0, 10); if (d > 今日) continue;
+        if (最後 === null || d > 最後) 最後 = d;
+        if (位置.has(d)) 毎日[位置.get(d)]++;
+      }
+      機能.push({ 名前, 毎日, 合計: 毎日.reduce((a, b) => a + b, 0), 最後 });
+    }
+    return { 日付, 日数, 機能, 使った機能の数_7日: 機能.filter(x => x.最後 && x.最後 >= 七日前).length, まだ使っていない: 機能.filter(x => x.最後 === null).map(x => x.名前) };
+  }
+  // 絵（SVG の文字列）：上に事実の一言、日ごとの回数の表（行＝機能・列＝日）、合計の横棒（多い順）。幅は画面の幅（px）を渡す
+  // 色：文字は currentColor（画面の文字色）。ます目は青1色の濃さ（透明度）なので、明るい画面でも暗い画面でも読める
+  function 使った機能を描く(集計, 幅 = 360) {
+    const 逃 = s => String(s === undefined || s === null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const W = Math.max(300, Math.round(+幅 || 360)), 機能 = (集計 && 集計.機能) || [], 日付 = (集計 && 集計.日付) || [], n = 日付.length || 1;
+    const 青 = "#2a78d6", 濃さ = [0.42, 0.64, 0.84, 1], 段 = v => v >= 8 ? 3 : v >= 4 ? 2 : v >= 2 ? 1 : 0, 字 = W < 480 ? 11 : 12;
+    const 月日 = d => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || ""); return m ? (+m[2]) + "/" + (+m[3]) : ""; };
+    const LW = Math.min(140, Math.round(W * 0.3)), gx = LW + 6, gw = W - gx - 2, 歩 = gw / n, cw = Math.max(2, 歩 - (歩 > 8 ? 2 : 1)), RH = 18, ch = 14;
+    const 出 = []; let y = 0;
+    const 文 = (x, yy, s, 付け = "") => 出.push(`<text x="${x}" y="${yy}" fill="currentColor" ${付け}>${逃(s)}</text>`);
+    // 事実
+    y += 16; 文(0, y, "この7日で使った機能：" + ((集計 && 集計.使った機能の数_7日) || 0) + "種類", `font-size="14" font-weight="bold"`);
+    const まだ = (集計 && 集計.まだ使っていない) || [];
+    if (!機能.length) { y += 20; 文(0, y, "記録がまだありません", `font-size="12" fill-opacity=".7"`); }
+    else if (まだ.length) {
+      const 一行 = Math.max(10, Math.floor(W / 12)); let 行 = "まだ使っていない：";
+      for (const [i, 名] of まだ.entries()) { const 足 = 名 + (i < まだ.length - 1 ? "、" : ""); if ((行 + 足).length > 一行) { y += 18; 文(0, y, 行, `font-size="12" fill-opacity=".7"`); 行 = "　"; } 行 += 足; }
+      y += 18; 文(0, y, 行, `font-size="12" fill-opacity=".7"`);
+    }
+    if (機能.length) {
+      // 日ごとの回数
+      y += 30; 文(0, y, "日ごとの回数（直近" + 日付.length + "日）", `font-size="13" font-weight="bold"`); y += 8;
+      機能.forEach((f, i) => {
+        const yy = y + i * RH; 文(LW, yy + 11, f.名前, `font-size="${字}" text-anchor="end"`);
+        (f.毎日 || []).forEach((v, j) => {
+          const 色 = v > 0 ? `fill="${青}" fill-opacity="${濃さ[段(v)]}"` : `fill="currentColor" fill-opacity=".08"`;
+          出.push(`<rect class="使ったます" x="${(gx + j * 歩).toFixed(1)}" y="${yy}" width="${cw.toFixed(1)}" height="${ch}" rx="2" ${色}><title>${逃(f.名前 + "　" + 月日(日付[j]) + "：" + v + "回")}</title></rect>`);
+        });
+      });
+      y += 機能.length * RH + 10;
+      for (let j = n - 1; j >= 0; j -= 7) {
+        const 終 = j === n - 1, x = 終 ? gx + (n - 1) * 歩 + cw : gx + j * 歩 + cw / 2;
+        文(x.toFixed(1), y, 終 ? "今日" : 月日(日付[j]), `font-size="10" fill-opacity=".7" text-anchor="${終 ? "end" : "middle"}"`);
+      }
+      // 凡例
+      y += 20; let lx = gx; 文(LW, y, "回数", `font-size="10" fill-opacity=".7" text-anchor="end"`);
+      for (const [名, k] of [["0", -1], ["1", 0], ["2–3", 1], ["4–7", 2], ["8以上", 3]]) {
+        出.push(`<rect x="${lx}" y="${y - 9}" width="10" height="10" rx="2" ${k < 0 ? `fill="currentColor" fill-opacity=".08"` : `fill="${青}" fill-opacity="${濃さ[k]}"`}/>`);
+        文(lx + 13, y, 名, `font-size="10" fill-opacity=".7"`); lx += 13 + 名.length * 7 + 12;
+      }
+      // 合計（多い順）
+      y += 32; 文(0, y, "直近" + 日付.length + "日の合計（多い順）", `font-size="13" font-weight="bold"`); y += 8;
+      const 並び = 機能.map((f, i) => [f, i]).sort((a, b) => b[0].合計 - a[0].合計 || a[1] - b[1]).map(x => x[0]);
+      const 最大 = Math.max(1, ...並び.map(f => f.合計)), bw = W - gx - 40, bh = 10;
+      並び.forEach((f, i) => {
+        const yy = y + i * RH, 長 = f.合計 / 最大 * bw, r = Math.min(4, 長 / 2, bh / 2);
+        文(LW, yy + 11, f.名前, `font-size="${字}" text-anchor="end"`);
+        const 説明 = `<title>${逃(f.名前 + "：" + f.合計 + "回（最後に使った日：" + (f.最後 || "なし") + "）")}</title>`;
+        if (長 > 0) 出.push(`<path d="M${gx} ${yy + 2}h${(長 - r).toFixed(1)}a${r} ${r} 0 0 1 ${r} ${r}v${bh - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${(-(長 - r)).toFixed(1)}z" fill="${青}">${説明}</path>`);
+        文((gx + 長 + 4).toFixed(1), yy + 11, String(f.合計), `font-size="11" fill-opacity="${f.合計 ? 1 : 0.6}"`);
+      });
+      y += 並び.length * RH;
+    }
+    y += 6;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${y}" viewBox="0 0 ${W} ${y}" role="img" aria-label="使った機能" style="max-width:100%;height:auto;font-family:inherit">${出.join("")}</svg>`;
   }
 
   const 公開 = { 締切を整える, 点数, 順位表, 提案, 理由を作る, 残りの言い方, 今日の様子, 新しいid, 更新印, 削除印, 生きている, タスクを足す, タスクを直す, タスクを消す,
@@ -775,6 +1019,6 @@
                  通信の状況, 通信の返事, 節目の文, 実験の材料, 実験の組, 実験の文, カレンダー設定, 望む予定, 予定の差, 空き時間, 今の空き, 倍率の表, 使う見積もり, 相場を足す, 分解の案, 分解して足す, 提案を記録, 反応を記録, あとでを戻す, 五分を始める, 五分を終える, 状態を記録, 使える状態, 預ける, メモ設定, メモを足す, メモを直す, メモを消す, 締切の一覧, 月の表, 日付文字, 時刻文字,
                  一覧を混ぜる, 価値観を混ぜる, 古い削除を消す, 同期を組み立てる, 同期ファイルを確かめる, 同期を実行,
                  点数を計算, 疲れを計算, 出来事を書く, 開く, 睡眠を答える, 達成する, 会話の点, 生活の状態, 顔の名前, 放置日数の合計,
-                 箱の中身, 預けを開く, 預けに反応する, 封じる, 封をやめる, 今の封, 今日の封印, 封を済にする, 次の問い, 価値観に答える, 価値観を今日はやめる, ニュースを並べる };
+                 箱の中身, 預けを開く, 預けに反応する, 封じる, 封をやめる, 今の封, 今日の封印, 封を済にする, 次の問い, 価値観に答える, 価値観を今日はやめる, ニュースを並べる, 通信の表情, AIの依頼を足す, 届いた返事, 使った機能の表, 使った機能の集計, 使った機能を描く, 筋トレの様子, 筋トレをやった, 筋トレを取り消す, 最初の一手, 記録を引く, 街の材料, 街の様子, 街の説明, 街を描く };
   if (typeof module !== "undefined" && module.exports) module.exports = 公開; else root.LifePilot = 公開;
 })(typeof self !== "undefined" ? self : this);
