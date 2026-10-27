@@ -297,13 +297,28 @@ function 状態の引数() {
 }
 function 提案画面() {
   const 選択肢 = 設定.柱A.空き時間の選択肢, { 状態 } = 状態の引数();
-  $("本体").innerHTML = `<h1>今なにする？</h1>
+  $("本体").innerHTML = `<h1>今なにする？</h1><div id="休会"></div>
     <p class="小">${状態 ? `使っている入力：体${状態.体}%・気分${状態.気分}${状態.電池 !== null ? "・電池" + 状態.電池 + "%" : ""}` : "入力がないので、体と気分は使っていません。「体と気分」から入れられます。"}</p>
     <p>空き時間を選んでください。</p><div class="選択" id="空き">${選択肢.map((x, i) => `<button data-v="${x}">${x}分${i === 選択肢.length - 1 ? "以上" : ""}</button>`).join("")}</div>
     <div id="封印"></div><div id="カード"></div><div id="問い"></div>`;
-  封印を出す(); 問いを出す();
+  休会を描く(); 封印を出す(); 問いを出す();
   $("空き").onclick = e => { const b = e.target.closest("button"); if (!b) return; 今の空き = Number(b.dataset.v); 提案を出す(); };
   if (今の空き) 提案を出す();
+}
+function 休会を描く() {                                  // 休会ボタンと、復帰画面（第2段階）
+  if (L.休会中(データ)) {
+    $("休会").innerHTML = `<div class="カード"><p class="一手">休会中です</p><p class="小">通知も提案も止めています。記録の空欄は、空欄のままです。再開は、このボタンを押した時だけです。</p><button class="押す 濃" id="再開">再開する</button></div>`;
+    $("再開").onclick = () => { L.再開する(データ); 保存(); 提案画面(); }; return;
+  }
+  $("休会").innerHTML = `<p class="小"><button class="押す" id="休会する">休会する</button>　通知と提案を止めます（いつでも、自分で再開できます）</p>`;
+  $("休会する").onclick = () => { L.休会する(データ); 保存(); 提案画面(); };
+  const 復 = L.復帰の材料(データ, 設定); if (復) 復帰を出す(復);
+}
+function 復帰を出す(c) {
+  const 文 = c.理由 === "再開" ? "再開しました。" + (c.休んだ日数 !== null ? c.休んだ日数 + "日、休んでいました。" : "") : "久しぶりです（" + c.休んだ日数 + "日ぶり）。";
+  $("カード").innerHTML = `<div class="カード"><p class="一手">おかえりなさい</p><p>${文}</p><p class="小">前回の最後の一手：<span id="復一手"></span>　／　前回の待ち時間：${c.待ち時間 ? c.待ち時間 + "分" : "なし"}</p><button class="押す 濃" id="復閉じる">提案を見る</button></div>`;
+  $("復一手").textContent = c.最後の一手 || "なし";
+  $("復閉じる").onclick = () => { L.復帰を見た(データ, 設定); 保存(); $("カード").innerHTML = ""; if (今の空き) 提案を出す(); };
 }
 function 封印を出す() {
   const r = L.今日の封印(データ); if (!r) { $("封印").innerHTML = ""; return; }
@@ -347,6 +362,8 @@ function 時間を聞く(x) {          // 相場帳：どのくらいかかっ�
 }
 function 提案を出す() {
   $("空き").querySelectorAll("button").forEach(b => b.classList.toggle("選ばれ", Number(b.dataset.v) === 今の空き));
+  if (L.休会中(データ)) { $("カード").innerHTML = `<div class="カード"><p class="一手">休会中です。提案は止めています。</p></div>`; return; }
+  { const 復 = L.復帰の材料(データ, 設定); if (復) { 復帰を出す(復); return; } }
   const { 状態, 体, 低, 電池 } = 状態の引数(), r = L.提案(データ, 設定, 今の空き, 体, 低, new Date(), 電池);
   const 戻す = r.あとでの件数 ? `<p><button class="押す" id="戻す">今やらないにした物を戻す（${r.あとでの件数}件）</button></p>` : "";
   if (r.候補なし) { 今の提案 = null; $("カード").innerHTML = `<div class="カード"><p class="一手">${安全(r.文)}</p>${戻す}</div>`; }
