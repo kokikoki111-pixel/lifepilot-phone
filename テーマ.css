@@ -419,6 +419,300 @@ body.lp-スマホ #本体::before {
 }
 @media (max-width: 640px) { .lp-題 { min-height: 84px; } }
 
+/* ================= 11c. ゲームの操作盤（入力欄・ボタン・名札・表）。前の決まりの上に重ねる ================= */
+/* 形：角を斜めに切ったパネル（左上と右下）。角に地区の色の印 */
+:root { --lp-切: 9px; --lp-切小: 7px; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]),
+select, textarea {
+  border-radius: 0; caret-color: var(--lp-色);
+  clip-path: polygon(var(--lp-切) 0, 100% 0, 100% calc(100% - var(--lp-切)), calc(100% - var(--lp-切)) 100%, 0 100%, 0 var(--lp-切));
+  border: 1px solid rgba(var(--lp-色rgb), .32);
+  background:
+    linear-gradient(135deg, rgba(var(--lp-色rgb), .85) 0 calc(var(--lp-切) - 1px), transparent var(--lp-切)) top left / 16px 16px no-repeat,
+    linear-gradient(-45deg, rgba(var(--lp-色rgb), .85) 0 calc(var(--lp-切) - 1px), transparent var(--lp-切)) bottom right / 16px 16px no-repeat,
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .018) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #04120c, #071b13);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .5), inset 0 8px 14px -8px rgba(0, 0, 0, .8);
+  padding-left: 14px;
+  transition: border-color .15s, box-shadow .2s, background-color .2s;
+}
+input:hover, select:hover, textarea:hover { border-color: rgba(var(--lp-色rgb), .65); }
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus, select:focus, textarea:focus {
+  border-color: var(--lp-色);
+  box-shadow: inset 0 0 0 1px rgba(var(--lp-色rgb), .35), inset 0 0 18px rgba(var(--lp-色rgb), .22), inset 0 -2px 0 var(--lp-色);
+}
+input[type="number"], input[type="datetime-local"], input[type="date"], input[type="time"] { font-family: var(--lp-等幅); letter-spacing: .04em; }
+input::-webkit-calendar-picker-indicator { filter: invert(.8) sepia(1) saturate(4) hue-rotate(5deg); cursor: pointer; opacity: .85; }
+/* 選ぶ欄：自前の金の矢印 */
+select {
+  -webkit-appearance: none; appearance: none; padding-right: 38px; cursor: pointer;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%23ffd36b' stroke-width='2.2'/%3E%3C/svg%3E") right 13px center / 14px 9px no-repeat,
+    linear-gradient(90deg, transparent calc(100% - 36px), rgba(var(--lp-色rgb), .1) calc(100% - 36px)),
+    linear-gradient(135deg, rgba(var(--lp-色rgb), .85) 0 calc(var(--lp-切) - 1px), transparent var(--lp-切)) top left / 16px 16px no-repeat,
+    linear-gradient(-45deg, rgba(var(--lp-色rgb), .85) 0 calc(var(--lp-切) - 1px), transparent var(--lp-切)) bottom right / 16px 16px no-repeat,
+    linear-gradient(180deg, #04120c, #071b13);
+}
+/* 名札（入力欄の上の言葉）：計器の小さな文字と、▸ の印 */
+label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])) {
+  display: block; margin: 16px 0 6px; font-size: 12.5px; font-weight: 700; letter-spacing: .1em; color: #cfe6da;
+}
+label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"]))::before {
+  content: "▸"; margin-right: 7px; color: var(--lp-色); text-shadow: 0 0 8px rgba(var(--lp-色rgb), .8);
+}
+
+/* ボタン：角を切った板。主な一手は金の板に、光が流れる */
+button:not(nav#タブ button):not(.語 button), input[type="button"], input[type="submit"] {
+  position: relative; overflow: hidden; border-radius: 0; letter-spacing: .06em; font-weight: 600;
+  clip-path: polygon(var(--lp-切小) 0, 100% 0, 100% calc(100% - var(--lp-切小)), calc(100% - var(--lp-切小)) 100%, 0 100%, 0 var(--lp-切小));
+  border: 1px solid rgba(var(--lp-色rgb), .5);
+  --lp-角印: linear-gradient(135deg, rgba(var(--lp-色rgb), .9) 0 calc(var(--lp-切小) - 1px), transparent var(--lp-切小)) top left / 12px 12px no-repeat,
+    linear-gradient(-45deg, rgba(var(--lp-色rgb), .9) 0 calc(var(--lp-切小) - 1px), transparent var(--lp-切小)) bottom right / 12px 12px no-repeat;
+  background: var(--lp-角印), linear-gradient(180deg, rgba(var(--lp-色rgb), .14), rgba(var(--lp-色rgb), .04)), linear-gradient(180deg, #123f2e, #0a2a1e);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 -3px 0 rgba(0, 0, 0, .35);
+  padding-left: 16px; padding-right: 16px;
+}
+button:not(nav#タブ button):not(.語 button):hover:not(:disabled) {
+  color: #fff; border-color: var(--lp-色);
+  background: var(--lp-角印), linear-gradient(180deg, rgba(var(--lp-色rgb), .3), rgba(var(--lp-色rgb), .08)), linear-gradient(180deg, #16503a, #0c3223);
+  box-shadow: inset 0 0 14px rgba(var(--lp-色rgb), .35), inset 0 -3px 0 rgba(0, 0, 0, .35);
+}
+button:not(nav#タブ button):not(.語 button)::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .28), transparent); transform: skewX(-20deg); opacity: 0;
+}
+button:not(nav#タブ button):not(.語 button):hover:not(:disabled)::after { opacity: 1; animation: lp-光が流れる .7s ease-out; left: 130%; }
+@keyframes lp-光が流れる { from { left: -60%; } to { left: 130%; } }
+button:not(nav#タブ button):not(.語 button):active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 2px 8px rgba(0, 0, 0, .5); }
+button.選ばれ, button.濃, button.lp-主, button[aria-pressed="true"],
+.状態 button.選ばれ, .選択 button.選ばれ, .切替 button.選ばれ {
+  border-color: #ffe9a6 !important; text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+  background: linear-gradient(135deg, #fff4c8 0 6px, transparent 7px) top left / 12px 12px no-repeat, linear-gradient(-45deg, #fff4c8 0 6px, transparent 7px) bottom right / 12px 12px no-repeat, linear-gradient(180deg, #ffe08a, #e2ad3f 55%, #b9832a) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -3px 0 rgba(120, 72, 10, .55), inset 0 0 0 1px rgba(255, 255, 255, .15) !important;
+}
+button.lp-主, button.濃 { min-width: 140px; padding-left: 30px; padding-right: 30px; font-size: 16px; letter-spacing: .14em; }
+button.lp-主::before, button.濃::before { content: "▶"; margin-right: 10px; font-size: .75em; vertical-align: 1px; }
+button.選ばれ:hover, button.濃:hover, button.lp-主:hover { filter: brightness(1.08); }
+#ask button { border-radius: 0; }
+
+/* 窓の中の道（上のリンク）：角を切った札 */
+.lp-道 a {
+  border-radius: 0; font-family: var(--lp-等幅); letter-spacing: .04em;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  border: 1px solid rgba(var(--lp-色rgb), .22); background: linear-gradient(180deg, rgba(var(--lp-色rgb), .08), rgba(0, 0, 0, .2));
+}
+
+/* 中の枠（カード）：四隅に計器の角の印 */
+.カード, .lp-書式 {
+  border-radius: 4px !important;
+  background:
+    linear-gradient(var(--lp-色), var(--lp-色)) top left / 14px 2px no-repeat, linear-gradient(var(--lp-色), var(--lp-色)) top left / 2px 14px no-repeat,
+    linear-gradient(var(--lp-色), var(--lp-色)) top right / 14px 2px no-repeat, linear-gradient(var(--lp-色), var(--lp-色)) top right / 2px 14px no-repeat,
+    linear-gradient(var(--lp-色), var(--lp-色)) bottom left / 14px 2px no-repeat, linear-gradient(var(--lp-色), var(--lp-色)) bottom left / 2px 14px no-repeat,
+    linear-gradient(var(--lp-色), var(--lp-色)) bottom right / 14px 2px no-repeat, linear-gradient(var(--lp-色), var(--lp-色)) bottom right / 2px 14px no-repeat,
+    linear-gradient(180deg, rgba(15, 51, 37, .88), rgba(7, 28, 20, .9)) !important;
+  border: 1px solid rgba(var(--lp-色rgb), .22) !important;
+}
+.カード > b:first-child, .lp-書式 > .lp-書式の題 {
+  display: block; margin: -2px 0 4px; font: 700 12px/1.6 var(--lp-等幅); letter-spacing: .2em; color: var(--lp-色);
+  text-shadow: 0 0 10px rgba(var(--lp-色rgb), .6); border-bottom: 1px dashed rgba(var(--lp-色rgb), .3); padding-bottom: 6px;
+}
+
+/* 受付の書式（Mac のタスク入力）：2列に並べる。狭い時は1列 */
+.lp-書式 { padding: 16px 20px 18px; margin: 18px 0 6px; }
+.lp-書式 .lp-欄並び { display: grid; grid-template-columns: 1fr 1fr; gap: 0 22px; }
+.lp-書式 .lp-欄並び > .lp-広い { grid-column: 1 / -1; }
+.lp-書式 .lp-欄並び input, .lp-書式 .lp-欄並び select { width: 100%; }
+.lp-書式 .lp-送る列 { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(var(--lp-色rgb), .18); }
+.lp-書式 .lp-送る列 button { margin-top: 0 !important; }
+@media (max-width: 640px) { .lp-書式 .lp-欄並び { grid-template-columns: 1fr; } }
+
+/* 表：一覧の帳簿。見出しは計器の文字、行に色の帯 */
+table { border-collapse: separate !important; border-spacing: 0 4px; }
+th { font: 700 11.5px/1.4 var(--lp-等幅) !important; letter-spacing: .12em; color: var(--lp-色) !important; background: none !important; border: none !important; border-bottom: 1px solid rgba(var(--lp-色rgb), .35) !important; padding: 6px 8px !important; }
+td { background: rgba(9, 34, 24, .7); border: none !important; border-top: 1px solid rgba(var(--lp-色rgb), .1) !important; border-bottom: 1px solid rgba(0, 0, 0, .4) !important; padding: 7px 8px !important; }
+tr > td:first-child { border-left: 3px solid rgba(var(--lp-色rgb), .55) !important; font-family: var(--lp-等幅); color: var(--lp-色); }
+tr:hover > td { background: rgba(var(--lp-色rgb), .1) !important; }
+[data-頁="暦"] table { border-spacing: 0; }
+[data-頁="暦"] td, [data-頁="暦"] tr > td:first-child { border: 1px solid var(--lp-線) !important; font-family: inherit; color: inherit; }
+
+/* ================= 13. NieR × 2077（2026-10-27）。生成りの細い線と反転する一覧（NieR）＋黄・水色・赤の光とちらつき（2077）。
+   基板の街の世界観と地区の絵は残す。前の決まり（1〜11c）の上に重ねる。戻す時は、この節を消す ================= */
+:root {
+  --n-骨: #e6e0cb; --n-骨rgb: 230, 224, 203;          /* NieR の生成り */
+  --n-黄: #fcee0a; --n-黄rgb: 252, 238, 10;           /* 2077 の黄 */
+  --n-水: #4ff3ff; --n-水rgb: 79, 243, 255;           /* 2077 の水色 */
+  --n-赤: #ff3d5a;
+  --n-地: #0a0d0c; --n-地2: #111614;
+  --lp-文字: var(--n-骨); --lp-副: #b5b09d; --lp-淡: #8f8b7c;
+  --lp-誤: var(--n-赤); --lp-済: var(--n-水);
+  --lp-字: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", -apple-system, sans-serif;
+}
+body.lp { color: var(--n-骨); }
+html { background-color: #060807; }
+body.lp::before {   /* 走査線（2077）。画面全体に薄く */
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .14) 0 1px, transparent 1px 3px); mix-blend-mode: multiply;
+}
+
+/* --- 窓：角のない細い枠。左上に黄の切り欠き --- */
+.lp-窓 {
+  border-radius: 0 !important; border: 1px solid rgba(var(--n-骨rgb), .32) !important;
+  background: linear-gradient(180deg, rgba(14, 18, 16, .94), rgba(8, 11, 10, .96)) !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), 0 24px 60px rgba(0, 0, 0, .6) !important;
+  position: relative;
+}
+.lp-窓::before {
+  content: ""; position: absolute; left: -1px; top: -1px; width: 64px; height: 4px; background: var(--n-黄); z-index: 3;
+  box-shadow: 70px 0 0 -1px rgba(var(--n-黄rgb), .35);
+}
+.lp-窓::after { display: none !important; }
+
+/* --- 題の帯：絵は残し、暗く沈めて大きな字。地区名は 2077 の黄の札 --- */
+.lp-題 { border-radius: 0 !important; border-bottom: 1px solid rgba(var(--n-骨rgb), .3) !important; }
+.lp-題 h1, .lp-題 .lp-名 {
+  font-size: 24px !important; font-weight: 800; letter-spacing: .14em; color: var(--n-骨) !important;
+  text-shadow: 2px 0 0 rgba(255, 61, 90, .55), -2px 0 0 rgba(79, 243, 255, .45) !important;
+  animation: n-ちらつく 2.4s steps(1) 1;
+}
+.lp-題 h1::before, .lp-題 .lp-名::before {
+  width: 12px !important; height: 12px !important; border-radius: 0 !important; margin-right: 12px !important;
+  background: var(--n-骨) !important; box-shadow: none !important; animation: none !important;
+}
+.lp-地区 {
+  border-radius: 0 !important; color: #0b0d0c !important; background: var(--n-黄) !important; border: none !important;
+  font-weight: 800 !important; letter-spacing: .18em !important; padding: 4px 14px 4px 10px !important;
+  clip-path: polygon(0 0, 100% 0, 100% 60%, calc(100% - 8px) 100%, 0 100%);
+}
+
+/* --- メニュー（NieR）：組の見出し、■ の行、選ぶと反転。広い画面では左の縦の列 --- */
+.lp-道 { background: rgba(0, 0, 0, .3) !important; border-color: rgba(var(--n-骨rgb), .18) !important; }
+.lp-道 .lp-組 {
+  display: block; flex-basis: 100%; margin: 14px 0 4px; padding: 0 0 4px 2px;
+  font: 700 10.5px/1.4 var(--lp-等幅); letter-spacing: .28em; color: rgba(var(--n-骨rgb), .55);
+  border-bottom: 1px solid rgba(var(--n-骨rgb), .18); background: none !important;
+}
+.lp-道 .lp-組:first-child { margin-top: 2px; }
+.lp-道 a {
+  position: relative; clip-path: none !important; border: none !important; border-radius: 0 !important;
+  background: none !important; color: var(--n-骨) !important; font-family: var(--lp-字) !important;
+  font-size: 13.5px !important; letter-spacing: .06em; padding: 6px 12px 6px 24px !important; min-height: 0 !important;
+}
+.lp-道 a::before { content: ""; position: absolute; left: 8px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; background: rgba(var(--n-骨rgb), .6); }
+.lp-道 a:hover, .lp-道 a:focus-visible, .lp-道 a[aria-current="page"] { background: var(--n-骨) !important; color: #0b0d0c !important; outline: none; }
+.lp-道 a:hover::before, .lp-道 a[aria-current="page"]::before { background: #0b0d0c; }
+.lp-道 a[aria-current="page"] { box-shadow: inset 4px 0 0 var(--n-黄); font-weight: 700; }
+@media (min-width: 900px) {
+  body.lp, :has(> .lp-窓) { max-width: 1240px !important; }
+  .lp-窓 { display: grid; grid-template-columns: 212px minmax(0, 1fr); grid-template-areas: "題 題" "道 中"; }
+  .lp-窓 > .lp-題 { grid-area: 題; }
+  .lp-窓 > .lp-道 { grid-area: 道; display: block !important; padding: 10px 10px 24px !important; border-bottom: none !important; border-right: 1px solid rgba(var(--n-骨rgb), .18) !important; }
+  .lp-窓 > .lp-道 a { display: block !important; margin: 1px 0 !important; }
+  .lp-窓 > .lp-中 { grid-area: 中; min-width: 0; padding: 8px 32px 32px !important; }
+  .lp-窓 > .lp-中 > * { max-width: 900px; }
+}
+@media (max-width: 899px) {
+  .lp-道 { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; gap: 2px !important; scrollbar-width: none; }
+  .lp-道 .lp-組 { flex: 0 0 auto; flex-basis: auto; margin: 0 4px 0 10px; border: none; padding: 7px 0 0; }
+  .lp-道 a { flex: 0 0 auto; white-space: nowrap; }
+}
+
+/* --- 見出し（NieR）：■ と細い線 --- */
+.lp-中 h2, #本体 h2 {
+  font-size: 15px !important; letter-spacing: .16em; color: var(--n-骨) !important; text-shadow: none !important;
+  border-bottom: 1px solid rgba(var(--n-骨rgb), .3) !important; padding-bottom: 6px;
+}
+.lp-中 h2::before, #本体 h2::before {
+  border-radius: 0 !important; border: none !important; background: var(--n-骨) !important; box-shadow: none !important;
+  width: 9px !important; height: 9px !important;
+}
+
+/* --- 入力欄：暗い欄に細い線。左上を切り、選ぶと水色に光る --- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]), select, textarea {
+  border: none !important; border-bottom: 1px solid rgba(var(--n-骨rgb), .55) !important;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px) !important;
+  background: linear-gradient(135deg, rgba(var(--n-骨rgb), .7) 0 9px, transparent 9.5px) top left / 14px 14px no-repeat,
+    linear-gradient(180deg, rgba(var(--n-骨rgb), .07), rgba(var(--n-骨rgb), .03)) !important;
+  box-shadow: inset 0 0 0 1px rgba(var(--n-骨rgb), .14) !important; color: var(--n-骨) !important; caret-color: var(--n-水);
+}
+select { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M1 3h10L6 9z' fill='%23e6e0cb'/%3E%3C/svg%3E") right 13px center / 11px 11px no-repeat,
+    linear-gradient(135deg, rgba(var(--n-骨rgb), .7) 0 9px, transparent 9.5px) top left / 14px 14px no-repeat,
+    linear-gradient(180deg, rgba(var(--n-骨rgb), .07), rgba(var(--n-骨rgb), .03)) !important; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus, select:focus, textarea:focus {
+  border-bottom-color: var(--n-水) !important;
+  box-shadow: inset 0 0 0 1px rgba(var(--n-水rgb), .55), inset 0 0 20px rgba(var(--n-水rgb), .16), 0 0 0 0 transparent !important;
+}
+input::placeholder, textarea::placeholder { color: rgba(var(--n-骨rgb), .38) !important; }
+select option { background: #121614; color: var(--n-骨); }
+input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--n-黄); }
+label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"])) { color: rgba(var(--n-骨rgb), .78) !important; font-family: var(--lp-等幅), var(--lp-字); letter-spacing: .14em; }
+label:not(:has(input[type="checkbox"])):not(:has(input[type="radio"]))::before { content: "■" !important; font-size: .7em; vertical-align: 1px; color: var(--n-骨) !important; text-shadow: none !important; }
+
+/* --- ボタン：生成りの線の札（選ぶと反転）。主な一手は 2077 の黄の板、触ると文字がずれる --- */
+button:not(nav#タブ button):not(.語 button), input[type="button"], input[type="submit"] {
+  clip-path: none !important; border-radius: 0 !important; color: var(--n-骨) !important;
+  border: 1px solid rgba(var(--n-骨rgb), .55) !important; background: rgba(var(--n-骨rgb), .05) !important;
+  box-shadow: none !important; letter-spacing: .08em; font-weight: 600;
+}
+button:not(nav#タブ button):not(.語 button):hover:not(:disabled) { background: var(--n-骨) !important; color: #0b0d0c !important; border-color: var(--n-骨) !important; }
+button:not(nav#タブ button):not(.語 button)::after { display: none; }
+button.選ばれ:not(nav#タブ button):not(.語 button), button.濃:not(nav#タブ button):not(.語 button), button.lp-主:not(nav#タブ button):not(.語 button), button[aria-pressed="true"]:not(nav#タブ button):not(.語 button) {
+  color: #0b0d0c !important; border: none !important; text-shadow: none !important; font-weight: 800 !important;
+  background: var(--n-黄) !important; box-shadow: 4px 4px 0 rgba(var(--n-水rgb), .55) !important;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%) !important;
+}
+button.lp-主, button.濃 { letter-spacing: .2em !important; }
+button.lp-主::before, button.濃::before { content: "▶" !important; }
+button.lp-主:not(nav#タブ button):not(.語 button):hover:not(:disabled), button.濃:not(nav#タブ button):not(.語 button):hover:not(:disabled), button.選ばれ:not(nav#タブ button):not(.語 button):hover:not(:disabled) {
+  background: var(--n-黄) !important; color: #0b0d0c !important; filter: none; animation: n-ずれる .28s steps(2) 2;
+}
+button:disabled { opacity: .35; }
+
+/* --- 枠（カード）：細い生成りの線と四隅の角 --- */
+.カード, .lp-書式, .箱, .部屋, .状態, .問い, details, #説明, .panel, .survey, #msgs {
+  border-radius: 0 !important; border: 1px solid rgba(var(--n-骨rgb), .2) !important; box-shadow: none !important;
+  background:
+    linear-gradient(var(--n-骨), var(--n-骨)) top left / 10px 1px no-repeat, linear-gradient(var(--n-骨), var(--n-骨)) top left / 1px 10px no-repeat,
+    linear-gradient(var(--n-骨), var(--n-骨)) bottom right / 10px 1px no-repeat, linear-gradient(var(--n-骨), var(--n-骨)) bottom right / 1px 10px no-repeat,
+    rgba(var(--n-骨rgb), .035) !important;
+}
+.カード > b:first-child, .lp-書式 > .lp-書式の題 { color: var(--n-黄) !important; text-shadow: none !important; border-bottom-color: rgba(var(--n-骨rgb), .22) !important; }
+.エラー { color: var(--n-赤) !important; } .完了 { color: var(--n-水) !important; }
+.小 { color: rgba(var(--n-骨rgb), .66) !important; }
+
+/* --- 表：生成りの帳簿 --- */
+th { color: rgba(var(--n-骨rgb), .7) !important; border-bottom-color: rgba(var(--n-骨rgb), .35) !important; }
+td { background: rgba(var(--n-骨rgb), .035) !important; border-top-color: rgba(var(--n-骨rgb), .08) !important; }
+tr > td:first-child { border-left-color: var(--n-黄) !important; color: var(--n-黄) !important; }
+tr:hover > td { background: rgba(var(--n-骨rgb), .1) !important; }
+[data-頁="暦"] td, [data-頁="暦"] tr > td:first-child { color: inherit !important; border-color: rgba(var(--n-骨rgb), .16) !important; }
+
+/* --- 現れ方（2077 のちらつき → NieR の静かな並び）。開いた時と、スマホでタブを替えた時 --- */
+@keyframes n-開く { 0% { clip-path: inset(0 0 100% 0); opacity: .2; } 30% { clip-path: inset(0 0 40% 0); transform: translateX(-6px) skewX(4deg); }
+  45% { transform: translateX(5px) skewX(-3deg); } 60% { transform: none; } 100% { clip-path: inset(0 0 0 0); opacity: 1; } }
+@keyframes n-並ぶ { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes n-ちらつく { 0% { opacity: .2; transform: translateX(-4px); } 6% { opacity: 1; transform: translateX(3px); } 10% { opacity: .6; transform: none; } 14%, 100% { opacity: 1; } }
+@keyframes n-ずれる { 0% { transform: translate(2px, -1px); text-shadow: -2px 0 var(--n-赤), 2px 0 var(--n-水); } 100% { transform: none; text-shadow: none; } }
+.lp-窓 { animation: n-開く .55s cubic-bezier(.2, .8, .2, 1) both; }
+[data-頁="窓"] .lp-窓, [data-頁="窓"] .lp-中 > *, [data-頁="窓"] .lp-題 h1 { animation: none !important; }   /* エルピーの窓は毎こま描き直すので、現れる動きを付けない */
+.lp-中 > *, #本体.n-現れる > * { animation: n-並ぶ .45s ease-out both; }
+.lp-中 > :nth-child(2), #本体.n-現れる > :nth-child(2) { animation-delay: .06s; } .lp-中 > :nth-child(3), #本体.n-現れる > :nth-child(3) { animation-delay: .12s; }
+.lp-中 > :nth-child(4), #本体.n-現れる > :nth-child(4) { animation-delay: .18s; } .lp-中 > :nth-child(n+5), #本体.n-現れる > :nth-child(n+5) { animation-delay: .24s; }
+
+/* --- スマホ版：下のタブを NieR の反転、題の帯は黄の札 --- */
+body.lp-スマホ #本体 { border-radius: 0 !important; border: 1px solid rgba(var(--n-骨rgb), .28) !important;
+  background: linear-gradient(180deg, rgba(14, 18, 16, .95), rgba(8, 11, 10, .97)) !important; box-shadow: 0 18px 40px rgba(0, 0, 0, .6) !important; }
+body.lp-スマホ #本体::after { display: none !important; }
+body.lp-スマホ #本体::before { color: #0b0d0c !important; border-radius: 0 !important; font-weight: 800; }
+body.lp-スマホ #本体::before { background:
+    linear-gradient(90deg, var(--n-黄) 0 calc(100% - 0px), transparent) bottom left / 100% 26px no-repeat,
+    linear-gradient(0deg, rgba(10, 13, 12, .95), rgba(10, 13, 12, .15) 75%),
+    var(--lp-帯, linear-gradient(transparent, transparent)) center 62% / cover no-repeat, #0a0d0c !important; padding-bottom: 6px !important; }
+body.lp-スマホ #本体 > h1:first-of-type { letter-spacing: .14em; text-shadow: 2px 0 0 rgba(255, 61, 90, .5), -2px 0 0 rgba(79, 243, 255, .4); }
+body.lp-スマホ nav#タブ { background: rgba(8, 10, 9, .97) !important; border-top: 1px solid rgba(var(--n-骨rgb), .4) !important; }
+body.lp-スマホ nav#タブ button { color: rgba(var(--n-骨rgb), .75) !important; border-top: none !important; font-family: var(--lp-字); letter-spacing: .04em; }
+body.lp-スマホ nav#タブ button.今 { color: #0b0d0c !important; background: var(--n-骨) !important; text-shadow: none !important; box-shadow: inset 0 3px 0 var(--n-黄) !important; }
+
 /* ================= 12. 動きを減らす設定 ================= */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
