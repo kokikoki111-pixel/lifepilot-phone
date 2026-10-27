@@ -32,14 +32,19 @@ async function 設定を読む() {
   設定 = await (await fetch("初期設定.json")).json();            // 個人のデータは入っていない、初めの設定
 }
 async function エルピーの設定を補う() {          // 古い設定（新しい項目がない）の時は、初めの設定から、足りない項目だけ足す
-  const 要る = ["エルピー", "倉庫", "相場帳", "分解", "カレンダー", "通信", "実験室", "街", "コーチ", "自由コーチ"];
-  const 揃う = () => 要る.every(k => 設定[k]) && (設定.コーチ || {}).最初の一手 && 設定.通信 && 設定.通信.節目.筋トレ && 設定.街 && 設定.街.一言.筋トレ;
+  const 要る = ["エルピー", "倉庫", "相場帳", "分解", "カレンダー", "通信", "実験室", "街", "コーチ", "自由コーチ", "見た目"];
+  const 揃う = () => 要る.every(k => 設定[k]) && (設定.コーチ || {}).最初の一手 && 設定.通信 && 設定.通信.節目.筋トレ && 設定.街 && 設定.街.一言.筋トレ && 設定.見た目;
   if (揃う()) return;
   try { const 初 = await (await fetch("初期設定.json")).json(); for (const k of 要る) if (!設定[k] && 初[k]) 設定[k] = 初[k]; if (設定.コーチ && !設定.コーチ.最初の一手 && 初.コーチ) 設定.コーチ.最初の一手 = 初.コーチ.最初の一手;
     for (const k of ["筋トレ", "筋トレの間"]) if (設定.通信 && !設定.通信.節目[k]) 設定.通信.節目[k] = 初.通信.節目[k];
     if (設定.街 && !設定.街.一言.筋トレ) 設定.街.一言.筋トレ = 初.街.一言.筋トレ; } catch (e) {}
 }
 const 言 = k => (設定.整備室.表示の言葉 || {})[k] || k;
+function このスマホの動き() { try { return localStorage.getItem("lifepilot_motion") || ""; } catch (e) { return ""; } }
+function 動きを当てる() {          // 背景の動き（多い／少ない／なし）。テーマ.css の 14b が見る
+  const v = このスマホの動き() || ((設定 && 設定.見た目) || {}).背景の動き;
+  document.body.dataset.動き = ["多い", "少ない", "なし"].includes(v) ? v : "多い";
+}
 function 出す(文, エラー) { const e = $("通知"); if (e) { e.className = エラー ? "エラー" : "完了"; e.textContent = 文; } }
 const 安全 = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -530,8 +535,12 @@ function 同期画面() {
     <p class="小" id="結果">${前 ? "前回：" + 前.日時 + "（" + 前.文 + "）" : "まだ、同期していません"}</p></div>
     <div class="カード"><label>Google のクライアントID（最初の1回だけ入れます）</label><input id="クライアントID" value="${安全(id)}" placeholder="xxxx.apps.googleusercontent.com" autocapitalize="off" autocorrect="off">
     <p class="小">Google Cloud で作る、アプリの「名前札」です（秘密ではありません）。入れ方は、準備の手順にあります。</p></div>
+    <div class="カード"><label>このスマホの背景の動き</label><select id="動き"><option value="">Mac の設定に合わせる（${安全(((設定.見た目 || {}).背景の動き) || "多い")}）</option><option>多い</option><option>少ない</option><option>なし</option></select>
+    <p class="小">重い時や、電池を減らしたい時は「少ない」か「なし」に。このスマホの中だけで、Mac には送りません。</p></div>
     <p class="小">記録の数：タスク ${L.生きている(データ.tasks).length}件・預け ${L.生きている(データ.deposits).length}件・メモ ${L.生きている(データ.memos || []).length}件・提案の記録 ${データ.suggestion_log.length}件。同期するまでは、このスマホの中だけです。ブラウザの「サイトのデータを消去」をすると、消えます。</p>`;
   $("同期ボタン").onclick = 同期する;
+  $("動き").value = このスマホの動き();
+  $("動き").onchange = () => { try { $("動き").value ? localStorage.setItem("lifepilot_motion", $("動き").value) : localStorage.removeItem("lifepilot_motion"); } catch (e) {} 動きを当てる(); 出す("背景の動きを変えました"); };
 }
 async function 同期する() {
   const id = $("クライアントID").value.trim();
@@ -542,7 +551,7 @@ async function 同期する() {
     const ドライブ = await LifePilotDrive.ドライブを作る(id);
     const r = await L.同期を実行(ドライブ, データ);
     データ = Object.assign(空データ(), r.新しいデータ); 保存();
-    if (r.設定) { 設定 = r.設定; await エルピーの設定を補う(); try { localStorage.setItem("lifepilot_settings", JSON.stringify(設定)); } catch (e) {} }
+    if (r.設定) { 設定 = r.設定; await エルピーの設定を補う(); 動きを当てる(); try { localStorage.setItem("lifepilot_settings", JSON.stringify(設定)); } catch (e) {} }
     if (r.ニュース) { try { localStorage.setItem("lifepilot_news", JSON.stringify(r.ニュース)); } catch (e) {} }
     let 見た = []; try { 見た = JSON.parse(localStorage.getItem("lifepilot_ai_shown") || "[]"); } catch (e) {}
     const 届 = L.届いた返事(データ, 見た);
@@ -618,5 +627,5 @@ function 街画面() {
 }
 
 // ================= 開始 =================
-(async () => { 読み込む(); await 設定を読む(); await エルピーの設定を補う(); try { 起動の節目(L.開く(データ)); 保存(); } catch (e) {} if (!画面一覧.some(x => x[0] === 画面)) 画面 = "提案"; 描く(); })().catch(e => { document.body.innerHTML = "<p style='padding:20px'>読み込めませんでした：" + e.message + "</p>"; });
+(async () => { 読み込む(); await 設定を読む(); await エルピーの設定を補う(); 動きを当てる(); try { 起動の節目(L.開く(データ)); 保存(); } catch (e) {} if (!画面一覧.some(x => x[0] === 画面)) 画面 = "提案"; 描く(); })().catch(e => { document.body.innerHTML = "<p style='padding:20px'>読み込めませんでした：" + e.message + "</p>"; });
 </script></body></html>

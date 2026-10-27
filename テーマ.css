@@ -777,6 +777,17 @@ body.lp-スマホ #本体 { position: relative; }
 
 @media (prefers-reduced-motion: reduce) { html::before, html::after, body.lp::after, .lp-窓::after, body.lp-スマホ #本体::after { animation: none !important; } }
 
+/* ================= 14b. 背景の動きの量（設定「見た目→背景の動き」。body の data-動き＝多い／少ない／なし） ================= */
+/* 少ない：絵の寄り引き・光の粒・走査の光・窓の中の光を止める。配線を流れる光だけ残す */
+html:has(body[data-動き="少ない"])::before, html:has(body[data-動き="なし"])::before { animation: none !important; transform: none !important; }
+html:has(body[data-動き="少ない"])::after { animation: none !important; }
+body[data-動き="少ない"]::after, body[data-動き="少ない"] .lp-窓::after, body[data-動き="少ない"] #本体::after,
+body[data-動き="なし"]::after, body[data-動き="なし"] .lp-窓::after, body[data-動き="なし"] #本体::after { animation: none !important; opacity: 0 !important; }
+/* なし：動きを全部止め、配線の光の絵も外し、透かしの処理（重い）もやめる */
+html:has(body[data-動き="なし"])::after { animation: none !important; background: radial-gradient(ellipse at 50% 40%, transparent 0 45%, rgba(0, 0, 0, .55) 100%) !important; }
+body[data-動き="なし"] *, body[data-動き="なし"] *::before, body[data-動き="なし"] *::after { animation: none !important; transition: none !important; }
+body[data-動き="なし"] .lp-窓, body[data-動き="なし"] #本体, body[data-動き="なし"] .カード { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+
 /* ================= 12. 動きを減らす設定 ================= */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
