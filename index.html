@@ -342,7 +342,7 @@ function 没頭タイマー(分, 終わった) {
 function 預ける画面() {
   const s = 設定.柱B;
   $("本体").innerHTML = `<h1>預ける</h1><p class="小">いまの気持ちや迷いを、一言、預けます。AIは、評価しません。</p>
-    <div class="カード"><label>一言</label><textarea id="本文"></textarea>
+    <div class="カード"><label>一言</label><textarea id="本文"></textarea><p class="小">声で入れたい時：キーボードの マイク ボタンが使えます。アプリは、声を録りません。</p>
     <label>種類（なくてもよい）</label><select id="種類"><option value="">（付けない）</option>${s.預ける種類.map(x => `<option>${x}</option>`).join("")}</select>
     <label>いつ、返してもらいますか</label><select id="返す">${s.返す日の選択肢.map(x => `<option>${安全(x.名前)}</option>`).join("")}</select>
     <button class="押す 濃" id="預けボタン">預ける</button> <span id="通知"></span></div>
