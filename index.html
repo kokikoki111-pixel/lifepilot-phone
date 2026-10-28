@@ -13,18 +13,18 @@ input,select,textarea{width:100%;padding:9px;font-size:16px;border:1px solid #aa
 .小{font-size:12px;color:var(--sub)} .エラー{color:#b00020} .完了{color:#2a6b2a} .行ボタン{display:flex;flex-wrap:wrap} .選択 button{padding:9px 14px;font-size:15px;margin:3px 5px 3px 0;border:1px solid #888;border-radius:8px;background:#fff} .選択 button.選ばれ{background:var(--accent);color:#fff}
 .時間{font-size:60px;font-weight:bold;font-variant-numeric:tabular-nums;margin:6px 0} .タスク行{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid #eee;padding:8px 0}
 </style>
-<link rel="stylesheet" href="テーマ.css?v=20261028m"></head><body class="lp lp-スマホ" data-地区="港">
+<link rel="stylesheet" href="テーマ.css?v=20261028n"></head><body class="lp lp-スマホ" data-地区="港">
 <main id="本体"></main>
 <nav id="タブ"></nav>
 <button id="メニュー鈕" aria-label="機能を開く" aria-haspopup="dialog">☰</button><div id="メニュー" role="dialog" aria-label="機能の切り替え" hidden></div>
-<script src="core.js?v=20261028m"></script><script src="絵_人物.js?v=20261028m"></script><script src="絵_街.js?v=20261028m"></script><script src="起動画面.js?v=20261028m"></script>
-<script src="drive.js?v=20261028m"></script>
-<script src="calendar.js?v=20261028m"></script>
+<script src="core.js?v=20261028n"></script><script src="絵_人物.js?v=20261028n"></script><script src="絵_街.js?v=20261028n"></script><script src="起動画面.js?v=20261028n"></script>
+<script src="drive.js?v=20261028n"></script>
+<script src="calendar.js?v=20261028n"></script>
 <script>
 // ================= データ（スマホの中に、持つ） =================
 const L = LifePilot, $ = id => document.getElementById(id);
 const 既定のクライアントID = "207746409667-k82tseegkc8ufkm9jj1ddam877mmj8tn.apps.googleusercontent.com";   // Google の「名前札」。秘密ではない
-const 空データ = () => ({ tasks: [], deposits: [], state_logs: [], seals: [], suggestion_log: [], focus_log: [], memos: [], life_events: [], sleep_logs: [], warehouse_items: [], wishlist: [], duration_log: [], workout_logs: [], ai_requests: [], ai_replies: [], values: { 答え: {}, 今日はやめた: {} } });
+const 空データ = () => ({ tasks: [], deposits: [], state_logs: [], seals: [], suggestion_log: [], focus_log: [], memos: [], life_events: [], sleep_logs: [], warehouse_items: [], wishlist: [], duration_log: [], workout_logs: [], ai_requests: [], ai_replies: [], class_notes: [], values: { 答え: {}, 今日はやめた: {} } });
 let データ = 空データ(), 設定 = null, 画面 = (decodeURIComponent(location.hash.slice(1)) || "提案"), 時計 = null, 今の提案 = null, 今の空き = 0, 五分の記録 = null;
 function 保存() { try { localStorage.setItem("lifepilot_data", JSON.stringify(データ)); } catch (e) { const 文 = "保存できませんでした（保存先がいっぱいか、使えない設定です）"; if ($("通知")) 出す(文, true); else alert(文); } }
 function 読み込む() { try { const s = localStorage.getItem("lifepilot_data"); if (s) データ = Object.assign(空データ(), JSON.parse(s)); } catch (e) { try { localStorage.setItem("lifepilot_data_broken", localStorage.getItem("lifepilot_data")); } catch (e2) {} データ = 空データ(); alert("記録が読めませんでした。壊れた記録は lifepilot_data_broken に残しました"); } }
@@ -55,13 +55,13 @@ function 出す(文, エラー) { const e = $("通知"); if (e) { e.className = 
 const 安全 = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 // ================= 画面の切り替え =================
-const 画面一覧 = [["提案", "今なにする？"], ["エルピー", "エルピー"], ["街", "街の地図"], ["筋トレ", "筋トレ"], ["使った", "使った機能"], ["タスク", "タスク"], ["カレンダー", "カレンダー"], ["メモ", "メモ"], ["預ける", "預ける"], ["引く", "記録を引く"], ["夜", "明日何やる？"], ["ニュース", "ニュース"], ["倉庫", "倉庫"], ["通信", "通信"], ["実験室", "実験室"], ["状態", "体と気分"], ["同期", "同期"]];
+const 画面一覧 = [["提案", "今なにする？"], ["エルピー", "エルピー"], ["街", "街の地図"], ["筋トレ", "筋トレ"], ["使った", "使った機能"], ["タスク", "タスク"], ["カレンダー", "カレンダー"], ["メモ", "メモ"], ["ノート", "授業ノート"], ["預ける", "預ける"], ["引く", "記録を引く"], ["夜", "明日何やる？"], ["ニュース", "ニュース"], ["倉庫", "倉庫"], ["通信", "通信"], ["実験室", "実験室"], ["状態", "体と気分"], ["同期", "同期"]];
 function 描く() {
   clearInterval(時計); document.body.dataset.画面 = 画面;          // 画面ごとの色・札は、この印で選ぶ（テーマ.css。:has() は重いので使わない）
   const 主な = ["提案", "タスク", "街", "メモ"], 未 = 未読の数();           // 下のタブは、よく使う4つ＋「その他」。全部の機能は、右上の ☰ か「その他」か、街の地図から
   $("タブ").innerHTML = 画面一覧.filter(([k]) => 主な.includes(k)).map(([k, 名]) => `<button class="${k === 画面 ? "今" : ""}" onclick="移る('${k}')">${名}</button>`).join("")
     + `<button class="${主な.includes(画面) ? "" : "今"}" onclick="メニューを開く()">${主な.includes(画面) ? "その他" : (画面一覧.find(x => x[0] === 画面) || [0, "その他"])[1]}${未 ? "（" + 未 + "）" : ""} ☰</button>`;
-  ({ 提案: 提案画面, エルピー: エルピー画面, 街: 街画面, 筋トレ: 筋トレ画面, 使った: 使った機能画面, タスク: () => タスク画面(), カレンダー: カレンダー画面, メモ: メモ画面, 預ける: 預ける画面, 引く: 引く画面, 夜: 夜画面, ニュース: ニュース画面, 倉庫: 倉庫画面, 通信: 通信画面, 実験室: 実験室画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
+  ({ 提案: 提案画面, エルピー: エルピー画面, 街: 街画面, 筋トレ: 筋トレ画面, 使った: 使った機能画面, タスク: () => タスク画面(), カレンダー: カレンダー画面, メモ: メモ画面, ノート: ノート画面, 預ける: 預ける画面, 引く: 引く画面, 夜: 夜画面, ニュース: ニュース画面, 倉庫: 倉庫画面, 通信: 通信画面, 実験室: 実験室画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
   const 本 = $("本体"); 本.classList.remove("n-現れる"); void 本.offsetWidth; 本.classList.add("n-現れる");   // タブを替えた時だけ、現れ方の動き（見た目の型 13節）
   setTimeout(() => { 本.classList.remove("n-現れる"); if (!本.className) 本.removeAttribute("class"); }, 800);
 }
@@ -69,7 +69,7 @@ let 同期中 = false;
 // ================= 機能の切り替え（右上の ☰・下の「その他」から開く全画面メニュー） =================
 const メニュー群 = [
   ["ACTION ・ 行動", [["提案", "今なにする？", "空いた時間の一手"], ["タスク", "タスク", "足す・直す・分ける"], ["カレンダー", "カレンダー", "締切と空き時間"], ["筋トレ", "筋トレ", "鍛錬場"], ["夜", "明日何やる？", "夜に朝の5分を決める"]]],
-  ["ARCHIVE ・ 記録", [["メモ", "メモ", "欲しい物・やりたい事"], ["預ける", "預ける", "一言と受け取り箱"], ["引く", "記録を引く", "過去の記録を探す"], ["倉庫", "倉庫", "買取・解体・焼却"]]],
+  ["ARCHIVE ・ 記録", [["メモ", "メモ", "欲しい物・やりたい事"], ["ノート", "授業ノート", "写真の文字を貼って残す"], ["預ける", "預ける", "一言と受け取り箱"], ["引く", "記録を引く", "過去の記録を探す"], ["倉庫", "倉庫", "買取・解体・焼却"]]],
   ["CITY ・ 街", [["街", "街の地図", "地区から機能へ"], ["エルピー", "エルピーの窓", "点数と睡眠"], ["通信", "通信", "リラとパーシー"], ["ニュース", "ニュース", "気になる情報"], ["実験室", "実験室", "15分の小さな実験"]]],
   ["SYSTEM ・ 整備", [["状態", "体と気分", "いまの調子"], ["使った", "使った機能", "使った日の表"], ["同期", "同期", "Drive・背景の動き"]]]];
 function メニューを開く() {
@@ -300,6 +300,27 @@ function メモを書く画面(m, 種類) {
   }
 }
 
+// ================= 授業ノート（写真の文字を貼って残す。Mac の /note-ocr と同じ記録で、同期で届く） =================
+function ノート画面() {
+  const 科目一覧 = [...new Set(L.生きている(データ.class_notes || []).map(r => r.科目))];
+  $("本体").innerHTML = `<h1>授業ノート</h1><p class="小">iPhone の写真アプリで、ノートの写真を開き、文字を長押し →「コピー」（テキスト認識表示）。ここに貼ると、科目と日付つきで残ります。文字にするのは iPhone の中だけで、外へは送りません。</p>
+    <div class="カード"><label>科目</label><input id="科目" list="科目候補" placeholder="例：経済学" maxlength="40"><datalist id="科目候補">${科目一覧.map(x => `<option value="${安全(x)}">`).join("")}</datalist>
+    <label>文字（読み間違いは、ここで直せます）</label><textarea id="ノート本文" class="メモ本文" style="min-height:30vh" placeholder="ここに貼る"></textarea>
+    <button class="押す 濃" id="ノート残す">残す</button> <span id="通知"></span></div>
+    <input id="ノート検索" type="search" placeholder="語で探す" class="メモ検索"><div class="カード メモ一覧" id="ノート一覧"></div>`;
+  const 描 = () => {
+    const 表 = L.ノートを探す(データ, $("ノート検索").value.trim()); $("ノート一覧").innerHTML = "";
+    if (!表.length) { $("ノート一覧").innerHTML = '<p class="小">まだありません。</p>'; return; }
+    for (const r of 表) {
+      const 行 = document.createElement("div"); 行.className = "メモ行"; 行.innerHTML = '<div class="題"></div><div class="下"><span class="日"></span><span class="先"></span><span><button class="押す 消">消す</button></span></div>';
+      行.querySelector(".題").textContent = r.科目 + "：" + (r.本文.split("\n")[0] || "").slice(0, 40); 行.querySelector(".日").textContent = r.日付.slice(5, 10).replace("-", "/"); 行.querySelector(".先").textContent = (r.本文.split("\n")[1] || "").slice(0, 40);
+      行.onclick = e => { if (e.target.closest(".消")) { if (confirm("このノートを消します。よろしいですか？")) { try { L.ノートを消す(データ, r.id); 保存(); ノート画面(); } catch (x) { 出す(x.message, true); } } } else { 出す(r.本文.slice(0, 600)); } };
+      $("ノート一覧").appendChild(行);
+    }
+  };
+  $("ノート検索").oninput = 描; 描();
+  $("ノート残す").onclick = () => { try { L.ノートを足す(データ, $("科目").value, $("ノート本文").value); 保存(); ノート画面(); setTimeout(() => 出す("残しました。同期すると、Mac にも届きます。"), 0); } catch (e) { 出す(e.message, true); } };
+}
 // ================= 預ける =================
 function 読み上げる(文, 言語) {
   try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(文); u.lang = 言語 || "ja-JP"; u.rate = 0.95; speechSynthesis.speak(u); } catch (e) {}
@@ -362,7 +383,7 @@ function 箱を描く(開く = null) {
   if (開く !== null) {
     let r; try { r = L.預けを開く(データ, 設定, 開く); 保存(); } catch (e) { $("箱").innerHTML = `<p class="エラー">${安全(e.message)}</p>`; return; }
     $("箱").innerHTML = `<h2>受け取り箱</h2><div class="カード"><p class="小">過去の自分から（${安全(r.日付.slice(0, 16))}）</p><p style="font-size:18px;white-space:pre-wrap" id="預け本文"></p>
-      <p class="小">${r.体 !== null || r.気分 ? "預けた時：体" + (r.体 ?? "—") + "%・気分" + (r.気分 ?? "—") : "預けた時の体と気分：入力なし"}</p>
+      ${r.種類 === "聞き慣れない語" ? `<p class="小">調べる（押した時だけ、この語が検索先に送られます）：<a href="https://ja.wikipedia.org/w/index.php?search=${encodeURIComponent(r.本文.slice(0, 40))}" target="_blank" rel="noopener noreferrer">Wikipedia</a>　<a href="https://www.weblio.jp/content/${encodeURIComponent(r.本文.slice(0, 40))}" target="_blank" rel="noopener noreferrer">Weblio</a></p>` : ""}<p class="小">${r.体 !== null || r.気分 ? "預けた時：体" + (r.体 ?? "—") + "%・気分" + (r.気分 ?? "—") : "預けた時の体と気分：入力なし"}</p>
       <div class="行ボタン">${L.区分(r, 設定) === "わからなかった一点" ? '<button data-x="解決済み">解決済み</button><button data-x="持ち越し">持ち越し</button>' : '<button data-x="いまも同じ">いまも同じ</button><button data-x="変わった">変わった</button>'}<button data-x="消す">消す</button><button data-x="閉じる">いまは閉じる</button></div><div id="預け直し"></div><span id="通知"></span></div>`;
     $("預け本文").textContent = r.本文;                       // 記録そのまま（AIの解釈なし）
     $("箱").querySelectorAll("[data-x]").forEach(b => b.onclick = () => {
@@ -441,6 +462,8 @@ function 休会を描く() {                                  // 休会ボタン
   $("休会").innerHTML = `<p class="小"><button class="押す" id="休会する">休会する</button>　通知と提案を止めます（いつでも、自分で再開できます）</p>`;
   $("休会する").onclick = () => { L.休会する(データ); 保存(); 提案画面(); };
   const 復 = L.復帰の材料(データ, 設定); if (復) 復帰を出す(復);
+  const 拠 = L.拠り所を出す(データ, 設定, false);            // 体が低い日だけ、自分で選んだ拠り所を1つ（記録そのまま。押し付けない）
+  if (拠) { const 枠 = document.createElement("div"); 枠.className = "カード"; 枠.innerHTML = '<p class="小">拠り所（自分で選んだ「勝ち」）</p><p class="一手"></p><p class="小"></p>'; 枠.children[1].textContent = 拠.本文; 枠.children[2].textContent = 拠.日付.slice(0, 10) + " の自分より。見なくても、かまいません。"; $("休会").appendChild(枠); }
 }
 function 復帰を出す(c) {
   const 文 = c.理由 === "再開" ? "再開しました。" + (c.休んだ日数 !== null ? c.休んだ日数 + "日、休んでいました。" : "") : "久しぶりです（" + c.休んだ日数 + "日ぶり）。";

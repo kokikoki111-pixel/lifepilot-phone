@@ -640,6 +640,21 @@
     return 棚[日の差("2026-01-01", 今) % 棚.length];
   }
 
+  // ---------- 授業ノート（Mac の N1 と同じ決まり。スマホでは、写真の文字を貼って残す。文字にするのは iPhone の「テキスト認識表示」） ----------
+  function ノートを足す(データ, 科目, 本文, 今 = new Date()) {
+    科目 = (科目 || "").trim(); 本文 = (本文 || "").trim();
+    if (!科目) throw new Error("科目を書いてください");
+    if (!本文) throw new Error("文字が空です");
+    if (本文.length > 20000) throw new Error("長すぎます（20000文字まで）");
+    データ.class_notes = データ.class_notes || [];
+    const r = 更新印({ id: 新しいid(データ.class_notes), 日付: 時刻文字(今), 科目, 本文 }, 今); データ.class_notes.push(r); return r;
+  }
+  function ノートを消す(データ, 番号, 今 = new Date()) {
+    const r = (データ.class_notes || []).find(x => x.id === 番号 && !x.削除); if (!r) throw new Error("そのノートはありません");
+    削除印(r, 今);
+  }
+  const ノートを探す = (データ, 語) => 生きている(データ.class_notes || []).filter(r => !語 || r.本文.includes(語) || r.科目.includes(語)).sort((a, b) => (a.日付 < b.日付 ? 1 : -1));
+
   // ---------- 思考の種（X10。Mac の X3 と同じ決まり：日付だけで、問いを1つ選ぶ） ----------
   function 今日の問い(設定, 今 = new Date()) { const 問い = 設定.思考の種.問い; return { 問い: 問い[日の差("2026-01-01", 今) % 問い.length], 分: 設定.思考の種.考える分 }; }
 
@@ -972,10 +987,13 @@ ${様.鍛錬場 ? 地区("鍛錬場", "鍛錬場", 110, 120, `<rect x="62" y="62
   }
 
   // ---------- 同期（突き合わせ。Mac 版の H1_突き合わせ.py と同じ決まり） ----------
-  const 形式の版 = 1, 混ぜる一覧名 = ["tasks", "deposits", "state_logs", "seals", "suggestion_log", "focus_log", "memos", "life_events", "sleep_logs", "warehouse_items", "wishlist", "duration_log", "workout_logs", "ai_requests", "ai_replies"];
+  const 形式の版 = 1, 混ぜる一覧名 = ["tasks", "deposits", "state_logs", "seals", "suggestion_log", "focus_log", "memos", "life_events", "sleep_logs", "warehouse_items", "wishlist", "duration_log", "workout_logs", "ai_requests", "ai_replies", "class_notes"];
   const 整列 = v => Array.isArray(v) ? v.map(整列) : (v && typeof v === "object") ? Object.keys(v).sort().reduce((o, k) => (o[k] = 整列(v[k]), o), {}) : v;
   const 同じ内容 = (a, b) => JSON.stringify(整列(a)) === JSON.stringify(整列(b));
-  const 新しい方 = (自分, 相手) => ((相手.更新日時 || "") > (自分.更新日時 || "") ? 相手 : 自分);
+  // 同じ時刻で中身が違う時は、並びを決めた JSON の文字が大きい方（Mac の H1 と同じ。両方で同じ側が勝つので、食い違いが残らない）
+  const 正規の文字 = v => JSON.stringify(v, (k, x) => (x && typeof x === "object" && !Array.isArray(x)) ? Object.fromEntries(Object.keys(x).sort((p, q) => { const A = Array.from(p), B = Array.from(q); for (let i = 0; i < Math.min(A.length, B.length); i++) { const d = A[i].codePointAt(0) - B[i].codePointAt(0); if (d) return d; } return A.length - B.length; }).map(k2 => [k2, x[k2]])) : x);
+  const 文字を比べる = (a, b) => { const A = Array.from(a), B = Array.from(b); for (let i = 0; i < Math.min(A.length, B.length); i++) { const d = A[i].codePointAt(0) - B[i].codePointAt(0); if (d) return d; } return A.length - B.length; };
+  const 新しい方 = (自分, 相手) => { const a = 自分.更新日時 || "", b = 相手.更新日時 || ""; if (b !== a) return b > a ? 相手 : 自分; return JSON.stringify(相手) !== JSON.stringify(自分) && 文字を比べる(正規の文字(相手), 正規の文字(自分)) > 0 ? 相手 : 自分; };
   function 一覧を混ぜる(自分, 相手) {
     const 混ぜた = new Map(自分.filter(r => r.id != null).map(r => [r.id, r])), id無し = 自分.filter(r => r.id == null); let 入った = 0;   // id 無しは、消さずに残し、相手からは入れない
     for (const r of 相手) {
@@ -1127,6 +1145,6 @@ ${様.鍛錬場 ? 地区("鍛錬場", "鍛錬場", 110, 120, `<rect x="62" y="62
                  通信の状況, 通信の返事, 節目の文, 実験の材料, 実験の組, 実験の文, 見出しの実験の文, カレンダー設定, 望む予定, 予定の差, 空き時間, 今の空き, 倍率の表, 使う見積もり, 相場を足す, 分解の案, 分解して足す, 提案を記録, 反応を記録, あとでを戻す, 五分を始める, 五分を終える, 状態を記録, 使える状態, 休会中, 休会する, 再開する, 復帰の材料, 復帰を見た, 預ける, メモ設定, メモを足す, メモを直す, メモを消す, 締切の一覧, 月の表, 日付文字, 時刻文字,
                  一覧を混ぜる, 価値観を混ぜる, 古い削除を消す, 同期を組み立てる, 同期ファイルを確かめる, 同期を実行,
                  点数を計算, 疲れを計算, 出来事を書く, 開く, 睡眠を答える, 達成する, 会話の点, 生活の状態, 顔の名前, 放置日数の合計,
-                 箱の中身, 区分, 今日の問い, 練習の問い, 日の終わりの点数, 段階を計算, 今の段階, 機能の木, もやっと回数, 勝ち一覧, 拠り所にする, 拠り所を出す, 預けを開く, 預けに反応する, 封じる, 封をやめる, 今の封, 今日の封印, 封を済にする, 次の問い, 価値観に答える, 価値観を今日はやめる, ニュースを並べる, 通信の表情, AIの依頼を足す, 届いた返事, 使った機能の表, 使った機能の集計, 使った機能を描く, 筋トレの様子, 筋トレをやった, 筋トレを取り消す, 最初の一手, 記録を引く, 街の材料, 街の様子, 街の説明, 街を描く };
+                 箱の中身, 区分, 今日の問い, 練習の問い, ノートを足す, ノートを消す, ノートを探す, 日の終わりの点数, 段階を計算, 今の段階, 機能の木, もやっと回数, 勝ち一覧, 拠り所にする, 拠り所を出す, 預けを開く, 預けに反応する, 封じる, 封をやめる, 今の封, 今日の封印, 封を済にする, 次の問い, 価値観に答える, 価値観を今日はやめる, ニュースを並べる, 通信の表情, AIの依頼を足す, 届いた返事, 使った機能の表, 使った機能の集計, 使った機能を描く, 筋トレの様子, 筋トレをやった, 筋トレを取り消す, 最初の一手, 記録を引く, 街の材料, 街の様子, 街の説明, 街を描く };
   if (typeof module !== "undefined" && module.exports) module.exports = 公開; else root.LifePilot = 公開;
 })(typeof self !== "undefined" ? self : this);
