@@ -830,3 +830,4 @@ html[data-動き="なし"] #メニュー, html[data-動き="少ない"] #メニ�
 .メモ本文 { width: 100%; box-sizing: border-box; min-height: 52vh; font-size: 16px; line-height: 1.6; resize: none; }
 .メモ下 { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
 html body.lp-スマホ button.メモ新規:not(nav#タブ button):not(.x):not(.y) { background: var(--lp-色, #ffd36b) !important; color: #10151a !important; border: 0 !important; border-radius: 50% !important; clip-path: none !important; }
+#起動アンケート .カード { max-height: 92vh; overflow-y: auto; } #起動アンケート input { width: 100%; margin: 4px 0 12px; box-sizing: border-box; }
