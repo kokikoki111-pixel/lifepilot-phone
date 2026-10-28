@@ -13,12 +13,13 @@ input,select,textarea{width:100%;padding:9px;font-size:16px;border:1px solid #aa
 .小{font-size:12px;color:var(--sub)} .エラー{color:#b00020} .完了{color:#2a6b2a} .行ボタン{display:flex;flex-wrap:wrap} .選択 button{padding:9px 14px;font-size:15px;margin:3px 5px 3px 0;border:1px solid #888;border-radius:8px;background:#fff} .選択 button.選ばれ{background:var(--accent);color:#fff}
 .時間{font-size:60px;font-weight:bold;font-variant-numeric:tabular-nums;margin:6px 0} .タスク行{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid #eee;padding:8px 0}
 </style>
-<link rel="stylesheet" href="テーマ.css?v=20261028b"></head><body class="lp lp-スマホ" data-地区="港">
+<link rel="stylesheet" href="テーマ.css?v=20261028g"></head><body class="lp lp-スマホ" data-地区="港">
 <main id="本体"></main>
 <nav id="タブ"></nav>
-<script src="core.js?v=20261028b"></script><script src="絵_人物.js?v=20261028b"></script><script src="絵_街.js?v=20261028b"></script><script src="起動画面.js?v=20261028b"></script>
-<script src="drive.js?v=20261028b"></script>
-<script src="calendar.js?v=20261028b"></script>
+<button id="メニュー鈕" aria-label="機能を開く" aria-haspopup="dialog">☰</button><div id="メニュー" role="dialog" aria-label="機能の切り替え" hidden></div>
+<script src="core.js?v=20261028g"></script><script src="絵_人物.js?v=20261028g"></script><script src="絵_街.js?v=20261028g"></script><script src="起動画面.js?v=20261028g"></script>
+<script src="drive.js?v=20261028g"></script>
+<script src="calendar.js?v=20261028g"></script>
 <script>
 // ================= データ（スマホの中に、持つ） =================
 const L = LifePilot, $ = id => document.getElementById(id);
@@ -42,8 +43,8 @@ async function エルピーの設定を補う() {          // 古い設定（新
 const 言 = k => (設定.整備室.表示の言葉 || {})[k] || k;
 function このスマホの動き() { try { return localStorage.getItem("lifepilot_motion") || ""; } catch (e) { return ""; } }
 function 動きを当てる() {          // 背景の動き（多い／少ない／なし）。テーマ.css の 14b が見る
-  const v = このスマホの動き() || ((設定 && 設定.見た目) || {}).背景の動き;
-  document.body.dataset.動き = ["多い", "少ない", "なし"].includes(v) ? v : "多い";
+  const v = このスマホの動き() || "少ない";          // スマホは、何も選んでいない時は「少ない」（熱くなる・遅くなる対策。Mac の設定には従わない。同期の画面で、選べる）
+  document.body.dataset.動き = document.documentElement.dataset.動き = ["多い", "少ない", "なし"].includes(v) ? v : "少ない";
 }
 function 出す(文, エラー) { const e = $("通知"); if (e) { e.className = エラー ? "エラー" : "完了"; e.textContent = 文; } }
 const 安全 = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -51,13 +52,49 @@ const 安全 = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<"
 // ================= 画面の切り替え =================
 const 画面一覧 = [["提案", "今なにする？"], ["エルピー", "エルピー"], ["街", "街の地図"], ["筋トレ", "筋トレ"], ["使った", "使った機能"], ["タスク", "タスク"], ["カレンダー", "カレンダー"], ["メモ", "メモ"], ["預ける", "預ける"], ["引く", "記録を引く"], ["夜", "明日何やる？"], ["ニュース", "ニュース"], ["倉庫", "倉庫"], ["通信", "通信"], ["実験室", "実験室"], ["状態", "体と気分"], ["同期", "同期"]];
 function 描く() {
-  clearInterval(時計);
-  $("タブ").innerHTML = 画面一覧.map(([k, 名]) => `<button class="${k === 画面 ? "今" : ""}" onclick="移る('${k}')">${名}${k === "通信" && 未読の数() ? "（" + 未読の数() + "）" : ""}</button>`).join("");
+  clearInterval(時計); document.body.dataset.画面 = 画面;          // 画面ごとの色・札は、この印で選ぶ（テーマ.css。:has() は重いので使わない）
+  const 主な = ["提案", "タスク", "街", "メモ"], 未 = 未読の数();           // 下のタブは、よく使う4つ＋「その他」。全部の機能は、右上の ☰ か「その他」か、街の地図から
+  $("タブ").innerHTML = 画面一覧.filter(([k]) => 主な.includes(k)).map(([k, 名]) => `<button class="${k === 画面 ? "今" : ""}" onclick="移る('${k}')">${名}</button>`).join("")
+    + `<button class="${主な.includes(画面) ? "" : "今"}" onclick="メニューを開く()">${主な.includes(画面) ? "その他" : (画面一覧.find(x => x[0] === 画面) || [0, "その他"])[1]}${未 ? "（" + 未 + "）" : ""} ☰</button>`;
   ({ 提案: 提案画面, エルピー: エルピー画面, 街: 街画面, 筋トレ: 筋トレ画面, 使った: 使った機能画面, タスク: () => タスク画面(), カレンダー: カレンダー画面, メモ: メモ画面, 預ける: 預ける画面, 引く: 引く画面, 夜: 夜画面, ニュース: ニュース画面, 倉庫: 倉庫画面, 通信: 通信画面, 実験室: 実験室画面, 状態: 状態画面, 同期: 同期画面 })[画面]();
   const 本 = $("本体"); 本.classList.remove("n-現れる"); void 本.offsetWidth; 本.classList.add("n-現れる");   // タブを替えた時だけ、現れ方の動き（見た目の型 13節）
   setTimeout(() => { 本.classList.remove("n-現れる"); if (!本.className) 本.removeAttribute("class"); }, 800);
 }
 let 同期中 = false;
+// ================= 機能の切り替え（右上の ☰・下の「その他」から開く全画面メニュー） =================
+const メニュー群 = [
+  ["ACTION ・ 行動", [["提案", "今なにする？", "空いた時間の一手"], ["タスク", "タスク", "足す・直す・分ける"], ["カレンダー", "カレンダー", "締切と空き時間"], ["筋トレ", "筋トレ", "鍛錬場"], ["夜", "明日何やる？", "夜に朝の5分を決める"]]],
+  ["ARCHIVE ・ 記録", [["メモ", "メモ", "欲しい物・やりたい事"], ["預ける", "預ける", "一言と受け取り箱"], ["引く", "記録を引く", "過去の記録を探す"], ["倉庫", "倉庫", "買取・解体・焼却"]]],
+  ["CITY ・ 街", [["街", "街の地図", "地区から機能へ"], ["エルピー", "エルピーの窓", "点数と睡眠"], ["通信", "通信", "リラとパーシー"], ["ニュース", "ニュース", "気になる情報"], ["実験室", "実験室", "15分の小さな実験"]]],
+  ["SYSTEM ・ 整備", [["状態", "体と気分", "いまの調子"], ["使った", "使った機能", "使った日の表"], ["同期", "同期", "Drive・背景の動き"]]]];
+function メニューを開く() {
+  const m = $("メニュー"), 未 = 未読の数();
+  m.innerHTML = `<div class="メニュー頭"><b>機能を選ぶ</b><button class="メニュー閉じる" aria-label="閉じる">✕</button></div>` + メニュー群.map(([組, 項]) => `<div class="メニュー組"><div class="メニュー組名">${組}</div><div class="メニュー格子">${項.map(([k, 名, 説]) => `<button class="メニュー項${k === 画面 ? " 今" : ""}" data-k="${k}"><span class="名">${名}${k === "通信" && 未 ? "（" + 未 + "）" : ""}</span><span class="説">${説}</span></button>`).join("")}</div></div>`).join("");
+  m.hidden = false; document.body.style.overflow = "hidden";
+  m.querySelector(".メニュー閉じる").onclick = メニューを閉じる;
+  m.onclick = e => { const b = e.target.closest(".メニュー項"); if (b) { メニューを閉じる(); 移る(b.dataset.k); } else if (e.target === m) メニューを閉じる(); };
+  const 今 = m.querySelector(".メニュー項.今") || m.querySelector(".メニュー項"); if (今) 今.focus();
+}
+function メニューを閉じる() { $("メニュー").hidden = true; document.body.style.overflow = ""; }
+$("メニュー鈕").onclick = メニューを開く;
+addEventListener("keydown", e => { if (e.key === "Escape" && !$("メニュー").hidden) メニューを閉じる(); });
+// ================= 起動時のアンケート（体と気分。アプリを開いた時に1回。答えなくてもよい） =================
+function 起動アンケート() {
+  try { if (sessionStorage.getItem("lp_アンケート済")) return; } catch (e) {}
+  if (((設定.土台2 || {}).起動アンケート) === false || L.休会中(データ) || L.復帰の材料(データ, 設定) || L.使える状態(データ, 設定)) return;      // 休会中・復帰画面・6時間以内の入力があれば、聞かない
+  try { sessionStorage.setItem("lp_アンケート済", "1"); } catch (e) {}
+  const 選び = { 体: null, 気分: null }, 要素 = document.createElement("div");
+  要素.id = "起動アンケート"; 要素.setAttribute("role", "dialog");
+  要素.innerHTML = `<div class="カード"><b>いまの調子は？</b><p class="小">答えなくてもかまいません。「今なにする？」の提案の重さに使います。</p>
+    <label>体</label><div class="選択" data-k="体">${[20, 40, 60, 80, 100].map(v => `<button data-v="${v}">${v}%</button>`).join("")}</div>
+    <label>気分</label><div class="選択" data-k="気分">${(設定.土台2 || {}).気分の選択肢 ? 設定.土台2.気分の選択肢.map(v => `<button data-v="${安全(v)}">${安全(v)}</button>`).join("") : ""}</div>
+    <div class="行ボタン"><button class="押す 濃" id="アンケ保存">保存する</button><button class="押す" id="アンケ飛ばす">今日はやめておく</button></div><p id="アンケ通知" class="小"></p></div>`;
+  document.body.appendChild(要素);
+  const 閉じる = () => 要素.remove();
+  要素.onclick = e => { const b = e.target.closest(".選択 button"); if (!b) return; const 枠 = b.parentElement; 枠.querySelectorAll("button").forEach(x => x.classList.remove("選ばれ")); b.classList.add("選ばれ"); 選び[枠.dataset.k] = 枠.dataset.k === "体" ? Number(b.dataset.v) : b.dataset.v; };
+  $("アンケ飛ばす").onclick = 閉じる;
+  $("アンケ保存").onclick = () => { try { L.状態を記録(データ, 設定, 選び.体, 選び.気分, null); 保存(); 閉じる(); if (画面 === "提案") 提案画面(); } catch (e) { $("アンケ通知").textContent = 選び.体 === null || 選び.気分 === null ? "体と気分を選んでください" : e.message; } };
+}
 function 移る(k) { if (同期中) return 出す("同期が終わるまで、お待ちください", true); if (五分の記録 && 時計 && !confirm("5分だけの途中です。移ると、計るのが止まります。移りますか")) return; 画面 = k; 描く(); }
 
 // ================= エルピー（生活の点数と、睡眠のアンケート） =================
@@ -199,21 +236,43 @@ function カレンダー画面() {
 
 // ================= メモ（欲しい物・やりたい事。期限なし。タスクとは別） =================
 let 取っておく内容 = null, 取っておく下書き = null;                                        // 「タスクにする」で、タスク画面の内容欄に入れる
-function メモ画面(直す = null) {
-  const 種類 = L.メモ設定(設定).種類, 生 = L.生きている(データ.memos || []).slice().reverse(), m = 直す ? 生.find(x => x.id === 直す) : null;
-  $("本体").innerHTML = `<h1>メモ</h1><p class="小">欲しい物・やりたい事を、期限なしで書いておく所です。「今なにする？」には出ません。</p>
-    <div class="カード"><b>${m ? "直す" : "書く"}</b><textarea id="本文">${安全(m?.本文)}</textarea>
-    <label>種類</label><select id="種類">${種類.map(x => `<option>${安全(x)}</option>`).join("")}</select>
-    <button class="押す 濃" id="送る">${m ? "保存" : "メモする"}</button>${m ? '<button class="押す" id="やめる">やめる</button>' : ""} <span id="通知"></span></div>
-    <h2>メモ（${生.length}件）</h2><div class="カード" id="一覧"></div>`;
-  if (m) $("種類").value = m.種類;
-  $("送る").onclick = () => { try { m ? L.メモを直す(データ, 設定, m.id, $("本文").value, $("種類").value) : L.メモを足す(データ, 設定, $("本文").value, $("種類").value); 保存(); メモ画面(); setTimeout(() => 出す(m ? "直しました。" : "メモしました。"), 0); } catch (e) { 出す(e.message, true); } };
-  if (m) $("やめる").onclick = () => メモ画面();
-  $("一覧").innerHTML = 生.map(r => `<div class="タスク行"><div style="flex:1;min-width:0"><div style="white-space:pre-wrap;overflow-wrap:anywhere">${安全(r.本文)}</div><div class="小">${安全(r.種類)}　${安全((r.日付 || "").slice(0, 10))}</div></div>
-    <div><button class="押す" data-d="${r.id}">直す</button> <button class="押す" data-t="${r.id}">タスクにする</button> <button class="押す" data-x="${r.id}">消す</button></div></div>`).join("") || '<p class="小">まだありません</p>';
-  $("一覧").querySelectorAll("[data-d]").forEach(b => b.onclick = () => メモ画面(+b.dataset.d));
-  $("一覧").querySelectorAll("[data-t]").forEach(b => b.onclick = () => { const r = 生.find(x => x.id === +b.dataset.t); 取っておく内容 = r.本文.split("\n")[0].slice(0, 60); 移る("タスク"); });
-  $("一覧").querySelectorAll("[data-x]").forEach(b => b.onclick = () => { if (confirm("このメモを消します。よろしいですか？")) { try { L.メモを消す(データ, +b.dataset.x); 保存(); メモ画面(); } catch (e) { 出す(e.message, true); } } });
+function メモ画面(直す = null, 検索 = "") {                         // iPhone のメモ風：一覧（1行目が題）→ タップで書く画面。検索つき
+  const 種類 = L.メモ設定(設定).種類, 生 = L.生きている(データ.memos || []).slice().sort((a, b) => ((b.更新日時 || b.日付) > (a.更新日時 || a.日付) ? 1 : -1));
+  if (直す !== null) return メモを書く画面(直す === "新規" ? null : 生.find(x => x.id === 直す), 種類);
+  $("本体").innerHTML = `<h1>メモ</h1><input id="検索" type="search" placeholder="検索" class="メモ検索"><p class="小" id="メモ件数"></p><div class="カード メモ一覧" id="一覧"></div><button class="メモ新規" id="新規" aria-label="新しいメモ">＋</button>`;
+  $("検索").value = 検索;
+  const 日 = r => { const s = r.日付 || "", 今日 = L.日付文字(new Date()); return s.slice(0, 10) === 今日 ? s.slice(11, 16) : s.slice(5, 10).replace("-", "/"); };
+  const 描 = () => {
+    const 語 = $("検索").value.trim(), 表 = 語 ? 生.filter(r => (r.本文 || "").includes(語)) : 生;
+    $("メモ件数").textContent = 表.length + "件" + (語 ? "（検索：" + 語 + "）" : "");
+    $("一覧").innerHTML = ""; if (!表.length) { $("一覧").innerHTML = '<p class="小">' + (語 ? "見つかりません" : "まだありません。右下の ＋ で書けます") + "</p>"; return; }
+    for (const r of 表) {
+      const 行 = document.createElement("div"); 行.className = "メモ行"; 行.tabIndex = 0; 行.innerHTML = `<div class="題"></div><div class="下"><span class="日"></span><span class="先"></span><span class="種"></span></div>`;
+      const 線 = (r.本文 || "").split("\n").map(x => x.trim()).filter(Boolean);
+      行.querySelector(".題").textContent = (線[0] || "（空のメモ）").slice(0, 60); 行.querySelector(".日").textContent = 日(r);
+      行.querySelector(".先").textContent = (線[1] || "追加のテキストなし").slice(0, 40); 行.querySelector(".種").textContent = r.種類 || "";
+      行.onclick = () => メモ画面(r.id); 行.onkeydown = e => { if (e.key === "Enter") メモ画面(r.id); };
+      $("一覧").appendChild(行);
+    }
+  };
+  $("検索").oninput = 描; 描(); $("新規").onclick = () => メモ画面("新規");
+}
+function メモを書く画面(m, 種類) {
+  $("本体").innerHTML = `<div class="メモ頭"><button class="押す" id="戻る">‹ メモ</button><button class="押す 濃" id="完了">完了</button></div>
+    <textarea id="本文" class="メモ本文" placeholder="メモ（1行目が題になります）"></textarea>
+    <div class="メモ下"><select id="種類">${種類.map(x => `<option>${安全(x)}</option>`).join("")}</select>${m ? '<button class="押す" id="タスクに">タスクにする</button><button class="押す" id="消す">消す</button>' : ""}</div><span id="通知"></span>`;
+  $("本文").value = m ? m.本文 : ""; if (m) $("種類").value = m.種類; $("本文").focus();
+  const 保存して戻る = () => {                                     // iPhone のメモと同じで、戻る・完了のどちらでも保存する。空のままなら、何も作らない
+    const 本文 = $("本文").value;
+    if (!本文.trim()) return メモ画面();
+    try { if (m) { if (本文 !== m.本文 || $("種類").value !== m.種類) L.メモを直す(データ, 設定, m.id, 本文, $("種類").value); } else L.メモを足す(データ, 設定, 本文, $("種類").value); 保存(); メモ画面(); }
+    catch (e) { 出す(e.message, true); }
+  };
+  $("戻る").onclick = 保存して戻る; $("完了").onclick = 保存して戻る;
+  if (m) {
+    $("タスクに").onclick = () => { 取っておく内容 = (m.本文 || "").split("\n")[0].slice(0, 60); 移る("タスク"); };
+    $("消す").onclick = () => { if (confirm("このメモを消します。よろしいですか？")) { try { L.メモを消す(データ, m.id); 保存(); メモ画面(); } catch (e) { 出す(e.message, true); } } };
+  }
 }
 
 // ================= 預ける =================
@@ -280,7 +339,9 @@ function 夜画面() {
 // ================= ニュース（見るだけ。Mac で集めた見出しを、同期で受け取る） =================
 function ニュース画面() {
   let ニュース = []; try { ニュース = JSON.parse(localStorage.getItem("lifepilot_news") || "[]"); } catch (e) {}
-  const 並び = L.ニュースを並べる(ニュース, 設定);
+  let 見た = []; try { 見た = JSON.parse(localStorage.getItem("lifepilot_news_seen") || "[]"); } catch (e) {}
+  const 並び = L.ニュースを並べる(ニュース.filter(r => !見た.includes(r.id) || r.反応 === "気になる"), 設定);      // 一度見た見出しは、もう出さない（Mac で「気になる」にした物は残る）
+  if (並び.length) { try { localStorage.setItem("lifepilot_news_seen", JSON.stringify([...new Set(見た.concat(並び.map(r => r.id)))].slice(-2000))); } catch (e) {} }
   $("本体").innerHTML = `<h1>ニュース</h1><p class="小">Yahoo!ニュースの「IT」の見出しです（個人利用のみ）。Mac で「更新」して、同期すると、ここに届きます。スマホからは、更新できません。</p><div id="一覧"></div>`;
   $("一覧").innerHTML = 並び.length ? "" : '<p class="小">見出しが、まだ、ありません。Mac で、ニュースを更新して、同期してください。</p>';
   for (const r of 並び) {
@@ -520,9 +581,13 @@ function 実験の材料() { let ニュース = []; try { ニュース = JSON.pa
 function 実験室画面() {
   const 長さ = (設定.実験室 || {}).長さ分 || 15, 記録 = 実験を読む();
   $("本体").innerHTML = `<h1>実験室</h1><p class="小">気になる物を、${長さ}分で小さく試す場所です。材料は、倉庫の物・預けた言葉・ニュースの「気になる」・タスクの題。結果は聞きません。持ち帰るのは1つだけ（書かなくてもよい）。</p><p id="通知"></p><div id="実験"></div>
+    <h2>見出しの興味から実験する</h2><div id="見出し一覧"></div>
     <h2>化学反応（組を引く）</h2><div class="行ボタン"><button id="引く">組を引く</button><button id="別">別の組を引く</button></div><div id="組"></div>
     <h2>自分の言葉の化学反応</h2><div class="カード"><input id="A" placeholder="言葉A" list="材料一覧"><input id="B" placeholder="言葉B" list="材料一覧"><datalist id="材料一覧">${実験の材料().map(m => `<option value="${安全(m.題)}">`).join("")}</datalist><button class="押す 濃" id="作る">実験を作る</button></div>
     <h2>これまでの実験</h2><div class="カード">${記録.slice().reverse().slice(0, 20).map(r => `<div class="タスク行"><span>${安全(r.材料.map(m => m.題).join(" × "))}<br><span class="小">${安全(r.日付.slice(0, 16))}${r.持ち帰り ? "　持ち帰り：" + 安全(r.持ち帰り) : ""}</span></span></div>`).join("") || '<p class="小">まだ、ありません。</p>'}</div>`;
+  const 見出し = 実験の材料().filter(m => m.出どころ === "気になる");
+  $("見出し一覧").innerHTML = 見出し.map((m, i) => `<div class="カード"><b>${安全(m.題)}</b><button class="押す" data-h="${i}">この見出しで実験する</button></div>`).join("") || '<p class="小">「気になる」にした見出しが、まだありません。Mac のニュースで「気になる」を押して、同期すると、ここに出ます。</p>';
+  $("見出し一覧").querySelectorAll("[data-h]").forEach(b => b.onclick = () => 始める("見出しの実験", [見出し[+b.dataset.h]], "ニュースで「気になる」にした見出しだからです。"));
   const 組を出す = 別 => {
     前の組 = L.実験の組(実験の材料(), new Date(), Math.random, 別 ? 前の組.flatMap(p => p.材料) : []);
     $("組").innerHTML = 前の組.map((p, i) => `<div class="カード"><b>${安全(p.材料[0].題)} × ${安全(p.材料[1].題)}</b><div class="小">${安全(p.材料[0].出どころ)}／${安全(p.材料[1].出どころ)}</div><div>${安全(p.理由)}</div><button class="押す" data-i="${i}">この組で実験する</button></div>`).join("") || '<p class="小">材料が足りません（2つ以上あると出ます）。下の「自分の言葉」なら、すぐ試せます。</p>';
@@ -531,7 +596,7 @@ function 実験室画面() {
   $("引く").onclick = () => 組を出す(false); $("別").onclick = () => 組を出す(true);
   $("作る").onclick = () => 始める("自分の言葉の化学反応", [{ 題: $("A").value.trim() }, { 題: $("B").value.trim() }], "");
   const 始める = (型, 材料, 理由) => {
-    let 文; try { 文 = L.実験の文(設定, 材料[0].題, 材料[1].題); } catch (e) { return 出す(e.message, true); }
+    let 文; try { 文 = 型 === "見出しの実験" ? L.見出しの実験の文(設定, 材料[0].題) : L.実験の文(設定, 材料[0].題, 材料[1].題); } catch (e) { return 出す(e.message, true); }
     今の実験 = { 日付: L.時刻文字(new Date()), 型, 材料: 材料.map(m => ({ 出どころ: m.出どころ || "自分", id: m.id ?? null, 題: m.題 })), 実験の内容: 文, 理由, 開始: Date.now() };
     const 終わり = Date.now() + 長さ * 60000; clearInterval(時計);
     $("実験").innerHTML = `<div class="カード"><b>${安全(材料.map(m => m.題).join(" × "))}</b><p>${安全(文)}</p><div class="時間" id="時間"></div><input id="持ち帰り" placeholder="持ち帰る1つ（書かなくてもよい）" maxlength="200"><button class="押す 濃" id="終える">終える（途中でもよい）</button></div>`;
@@ -552,7 +617,7 @@ function 同期画面() {
     <p class="小" id="結果">${前 ? "前回：" + 前.日時 + "（" + 前.文 + "）" : "まだ、同期していません"}</p></div>
     <div class="カード"><label>Google のクライアントID（最初の1回だけ入れます）</label><input id="クライアントID" value="${安全(id)}" placeholder="xxxx.apps.googleusercontent.com" autocapitalize="off" autocorrect="off">
     <p class="小">Google Cloud で作る、アプリの「名前札」です（秘密ではありません）。入れ方は、準備の手順にあります。</p></div>
-    <div class="カード"><label>このスマホの背景の動き</label><select id="動き"><option value="">Mac の設定に合わせる（${安全(((設定.見た目 || {}).背景の動き) || "多い")}）</option><option>多い</option><option>少ない</option><option>なし</option></select>
+    <div class="カード"><label>このスマホの背景の動き</label><select id="動き"><option value="">標準（少ない）</option><option>多い</option><option>少ない</option><option>なし</option></select>
     <p class="小">重い時や、電池を減らしたい時は「少ない」か「なし」に。このスマホの中だけで、Mac には送りません。</p></div>
     <p class="小">記録の数：タスク ${L.生きている(データ.tasks).length}件・預け ${L.生きている(データ.deposits).length}件・メモ ${L.生きている(データ.memos || []).length}件・提案の記録 ${データ.suggestion_log.length}件。同期するまでは、このスマホの中だけです。ブラウザの「サイトのデータを消去」をすると、消えます。</p>`;
   $("同期ボタン").onclick = 同期する;
@@ -634,7 +699,9 @@ function 街画面() {
   try { ニュース = JSON.parse(localStorage.getItem("lifepilot_news") || "[]"); } catch (e) {}
   try { const x = JSON.parse(localStorage.getItem("lifepilot_lastsync") || "null"); if (x && x.日時) 同期 = x.日時 + ":00"; } catch (e) {}
   const 様 = L.街の様子(L.街の材料(データ, 設定, new Date(), { ニュース: ニュース.filter(r => !r.反応).length, 同期 }), 設定);
-  $("本体").innerHTML = `<h1>街の地図</h1><div class="カード"><b>エルピー：</b><span id="街の一言"></span></div><div id="街"></div><div class="カード" id="街の説明"><span class="小">地区を押すと、その場所の様子と、つながる画面が出ます。</span></div>`;
+  $("本体").innerHTML = `<h1>街の地図</h1><div class="カード"><b>エルピー：</b><span id="街の一言"></span></div><div id="街"></div><div class="カード" id="街の説明"><span class="小">地区を押すと、その場所の様子と、つながる画面が出ます。</span></div>
+    <div class="カード"><b>地区から選ぶ</b><div class="行ボタン" id="地区一覧"></div></div>`;
+  for (const [名, 画] of [["港（今なにする？）", "提案"], ["広場（カレンダー）", "カレンダー"], ["鐘楼（締切）", "タスク"], ["楼閣（ニュース）", "ニュース"], ["穴（倉庫）", "倉庫"], ["池（睡眠）", "エルピー"], ["図書館（預ける）", "預ける"], ["遊歩道（メモ）", "メモ"], ["鍛錬場（筋トレ）", "筋トレ"], ["灯台（同期）", "同期"], ["反応室（実験室）", "実験室"], ["通信", "通信"]]) { const b = document.createElement("button"); b.className = "押す"; b.textContent = 名; b.onclick = () => 移る(画); $("地区一覧").appendChild(b); }
   $("街の一言").textContent = 様.一言; const 絵 = window.LifePilotArt街; $("街").innerHTML = 絵 && 絵.絵の街を描く ? 絵.絵の街を描く(様) : (絵 || L).街を描く(様);
   for (const g of document.querySelectorAll(".地区")) g.onclick = () => {
     const x = L.街の説明(g.dataset.k, 様), 枠 = $("街の説明");
@@ -644,5 +711,5 @@ function 街画面() {
 }
 
 // ================= 開始 =================
-(async () => { 読み込む(); await 設定を読む(); await エルピーの設定を補う(); 動きを当てる(); try { 起動の節目(L.開く(データ)); 保存(); } catch (e) {} if (!画面一覧.some(x => x[0] === 画面)) 画面 = "提案"; 描く(); })().catch(e => { document.body.innerHTML = "<p style='padding:20px'>読み込めませんでした：" + e.message + "</p>"; });
+(async () => { 読み込む(); await 設定を読む(); await エルピーの設定を補う(); 動きを当てる(); try { 起動の節目(L.開く(データ)); 保存(); } catch (e) {} if (!画面一覧.some(x => x[0] === 画面)) 画面 = "提案"; 描く(); 起動アンケート(); })().catch(e => { document.body.innerHTML = "<p style='padding:20px'>読み込めませんでした：" + e.message + "</p>"; });
 </script></body></html>

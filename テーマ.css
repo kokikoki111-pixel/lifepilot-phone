@@ -300,25 +300,25 @@ body.lp-スマホ #本体::before {
     radial-gradient(circle at 25px 50%, var(--lp-色) 3.5px, rgba(var(--lp-色rgb), .35) 5px, transparent 8px),
     linear-gradient(90deg, rgba(var(--lp-色rgb), .20), rgba(var(--lp-色rgb), .03) 60%, transparent);
 }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('提案')"]),
-body.lp-スマホ:has(#タブ button.今[onclick="移る('タスク')"]) { --lp-色: #ffd36b; --lp-色rgb: 255, 211, 107; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('提案')"]) { --lp-札: "LANTERN PIER ・ 港"; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('タスク')"]) { --lp-札: "LANTERN PIER ・ 荷の受付"; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('エルピー')"]) { --lp-札: "LUMINA PALACE ・ エルピーの窓"; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('街')"]) { --lp-札: "LUMINA PALACE ・ 街の地図"; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('筋トレ')"]) { --lp-札: "TRAINING YARD ・ 鍛錬場"; --lp-色: #ffab73; --lp-色rgb: 255, 171, 115; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('使った')"]) { --lp-札: "LINK PLAZA ・ 記録の塔"; --lp-色: #9fe3c4; --lp-色rgb: 159, 227, 196; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('カレンダー')"]) { --lp-札: "LINK PLAZA ・ 時刻盤"; --lp-色: #9fe3c4; --lp-色rgb: 159, 227, 196; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('メモ')"]) { --lp-札: "LUNE PASSAGE ・ 遊歩道"; --lp-色: #d6c8ff; --lp-色rgb: 214, 200, 255; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('預ける')"]) { --lp-札: "LORE PAGES ・ 図書館"; --lp-色: #9fbcf5; --lp-色rgb: 159, 188, 245; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('引く')"]) { --lp-札: "LORE PAGES ・ 書庫"; --lp-色: #9fbcf5; --lp-色rgb: 159, 188, 245; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('夜')"]) { --lp-札: "LUNAR POOL ・ ほとりの灯籠"; --lp-色: #5fd0e6; --lp-色rgb: 95, 208, 230; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('状態')"]) { --lp-札: "LUNAR POOL ・ 池"; --lp-色: #5fd0e6; --lp-色rgb: 95, 208, 230; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('ニュース')"]) { --lp-札: "LOUD PAVILION ・ 外界放送"; --lp-色: #e59cff; --lp-色rgb: 229, 156, 255; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('倉庫')"]) { --lp-札: "LOOP PIT ・ 買取所"; --lp-色: #b7c6d6; --lp-色rgb: 183, 198, 214; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('通信')"]) { --lp-札: "LINE PORT ・ 灯台"; --lp-色: #6fd3f7; --lp-色rgb: 111, 211, 247; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('同期')"]) { --lp-札: "LINE PORT ・ 双子の街への光"; --lp-色: #6fd3f7; --lp-色rgb: 111, 211, 247; }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('実験室')"]) { --lp-札: "LINK PLAZA B1 ・ 反応室"; --lp-色: #ff9fc4; --lp-色rgb: 255, 159, 196; }
+body.lp-スマホ[data-画面="提案"],
+body.lp-スマホ[data-画面="タスク"] { --lp-色: #ffd36b; --lp-色rgb: 255, 211, 107; }
+body.lp-スマホ[data-画面="提案"] { --lp-札: "LANTERN PIER ・ 港"; }
+body.lp-スマホ[data-画面="タスク"] { --lp-札: "LANTERN PIER ・ 荷の受付"; }
+body.lp-スマホ[data-画面="エルピー"] { --lp-札: "LUMINA PALACE ・ エルピーの窓"; }
+body.lp-スマホ[data-画面="街"] { --lp-札: "LUMINA PALACE ・ 街の地図"; }
+body.lp-スマホ[data-画面="筋トレ"] { --lp-札: "TRAINING YARD ・ 鍛錬場"; --lp-色: #ffab73; --lp-色rgb: 255, 171, 115; }
+body.lp-スマホ[data-画面="使った"] { --lp-札: "LINK PLAZA ・ 記録の塔"; --lp-色: #9fe3c4; --lp-色rgb: 159, 227, 196; }
+body.lp-スマホ[data-画面="カレンダー"] { --lp-札: "LINK PLAZA ・ 時刻盤"; --lp-色: #9fe3c4; --lp-色rgb: 159, 227, 196; }
+body.lp-スマホ[data-画面="メモ"] { --lp-札: "LUNE PASSAGE ・ 遊歩道"; --lp-色: #d6c8ff; --lp-色rgb: 214, 200, 255; }
+body.lp-スマホ[data-画面="預ける"] { --lp-札: "LORE PAGES ・ 図書館"; --lp-色: #9fbcf5; --lp-色rgb: 159, 188, 245; }
+body.lp-スマホ[data-画面="引く"] { --lp-札: "LORE PAGES ・ 書庫"; --lp-色: #9fbcf5; --lp-色rgb: 159, 188, 245; }
+body.lp-スマホ[data-画面="夜"] { --lp-札: "LUNAR POOL ・ ほとりの灯籠"; --lp-色: #5fd0e6; --lp-色rgb: 95, 208, 230; }
+body.lp-スマホ[data-画面="状態"] { --lp-札: "LUNAR POOL ・ 池"; --lp-色: #5fd0e6; --lp-色rgb: 95, 208, 230; }
+body.lp-スマホ[data-画面="ニュース"] { --lp-札: "LOUD PAVILION ・ 外界放送"; --lp-色: #e59cff; --lp-色rgb: 229, 156, 255; }
+body.lp-スマホ[data-画面="倉庫"] { --lp-札: "LOOP PIT ・ 買取所"; --lp-色: #b7c6d6; --lp-色rgb: 183, 198, 214; }
+body.lp-スマホ[data-画面="通信"] { --lp-札: "LINE PORT ・ 灯台"; --lp-色: #6fd3f7; --lp-色rgb: 111, 211, 247; }
+body.lp-スマホ[data-画面="同期"] { --lp-札: "LINE PORT ・ 双子の街への光"; --lp-色: #6fd3f7; --lp-色rgb: 111, 211, 247; }
+body.lp-スマホ[data-画面="実験室"] { --lp-札: "LINK PLAZA B1 ・ 反応室"; --lp-色: #ff9fc4; --lp-色rgb: 255, 159, 196; }
 /* 下のタブ（街の道路の、光る札） */
 body.lp-スマホ nav#タブ {
   background: linear-gradient(180deg, rgba(10, 31, 22, .94), rgba(5, 17, 11, .98)) !important;
@@ -393,23 +393,23 @@ body.lp-スマホ [style*="background:#f3b6b0"] { color: #ffd0c9; background: rg
     linear-gradient(90deg, rgba(var(--lp-色rgb), .20), rgba(var(--lp-色rgb), .04) 55%, transparent),
     var(--lp-帯, linear-gradient(transparent, transparent)) center 62% / cover no-repeat, #0a1f16;
 }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('提案')"]) { --lp-帯: url("絵/地区_港.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('タスク')"]) { --lp-帯: url("絵/地区_港.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('エルピー')"]) { --lp-帯: url("絵/地区_街.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('街')"]) { --lp-帯: url("絵/地区_街.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('筋トレ')"]) { --lp-帯: url("絵/地区_鍛錬場.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('使った')"]) { --lp-帯: url("絵/地区_広場.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('カレンダー')"]) { --lp-帯: url("絵/地区_広場.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('メモ')"]) { --lp-帯: url("絵/地区_遊歩道.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('預ける')"]) { --lp-帯: url("絵/地区_図書館.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('引く')"]) { --lp-帯: url("絵/地区_図書館.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('夜')"]) { --lp-帯: url("絵/地区_池.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('状態')"]) { --lp-帯: url("絵/地区_池.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('ニュース')"]) { --lp-帯: url("絵/地区_楼閣.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('倉庫')"]) { --lp-帯: url("絵/地区_穴.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('通信')"]) { --lp-帯: url("絵/地区_灯台.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('同期')"]) { --lp-帯: url("絵/地区_灯台.jpg"); }
-body.lp-スマホ:has(#タブ button.今[onclick="移る('実験室')"]) { --lp-帯: url("絵/地区_反応室.jpg"); }
+body.lp-スマホ[data-画面="提案"] { --lp-帯: url("絵/地区_港.jpg"); }
+body.lp-スマホ[data-画面="タスク"] { --lp-帯: url("絵/地区_港.jpg"); }
+body.lp-スマホ[data-画面="エルピー"] { --lp-帯: url("絵/地区_街.jpg"); }
+body.lp-スマホ[data-画面="街"] { --lp-帯: url("絵/地区_街.jpg"); }
+body.lp-スマホ[data-画面="筋トレ"] { --lp-帯: url("絵/地区_鍛錬場.jpg"); }
+body.lp-スマホ[data-画面="使った"] { --lp-帯: url("絵/地区_広場.jpg"); }
+body.lp-スマホ[data-画面="カレンダー"] { --lp-帯: url("絵/地区_広場.jpg"); }
+body.lp-スマホ[data-画面="メモ"] { --lp-帯: url("絵/地区_遊歩道.jpg"); }
+body.lp-スマホ[data-画面="預ける"] { --lp-帯: url("絵/地区_図書館.jpg"); }
+body.lp-スマホ[data-画面="引く"] { --lp-帯: url("絵/地区_図書館.jpg"); }
+body.lp-スマホ[data-画面="夜"] { --lp-帯: url("絵/地区_池.jpg"); }
+body.lp-スマホ[data-画面="状態"] { --lp-帯: url("絵/地区_池.jpg"); }
+body.lp-スマホ[data-画面="ニュース"] { --lp-帯: url("絵/地区_楼閣.jpg"); }
+body.lp-スマホ[data-画面="倉庫"] { --lp-帯: url("絵/地区_穴.jpg"); }
+body.lp-スマホ[data-画面="通信"] { --lp-帯: url("絵/地区_灯台.jpg"); }
+body.lp-スマホ[data-画面="同期"] { --lp-帯: url("絵/地区_灯台.jpg"); }
+body.lp-スマホ[data-画面="実験室"] { --lp-帯: url("絵/地区_反応室.jpg"); }
 body.lp-スマホ #本体::before {
   padding-top: 64px;
   background:
@@ -779,16 +779,54 @@ body.lp-スマホ #本体 { position: relative; }
 
 /* ================= 14b. 背景の動きの量（設定「見た目→背景の動き」。body の data-動き＝多い／少ない／なし） ================= */
 /* 少ない：絵の寄り引き・光の粒・走査の光・窓の中の光を止める。配線を流れる光だけ残す */
-html:has(body[data-動き="少ない"])::before, html:has(body[data-動き="なし"])::before { animation: none !important; transform: none !important; }
-html:has(body[data-動き="少ない"])::after { animation: none !important; }
+html[data-動き="少ない"]::before, html[data-動き="なし"]::before { animation: none !important; transform: none !important; }
+html[data-動き="少ない"]::after { animation: none !important; }
 body[data-動き="少ない"]::after, body[data-動き="少ない"] .lp-窓::after, body[data-動き="少ない"] #本体::after,
 body[data-動き="なし"]::after, body[data-動き="なし"] .lp-窓::after, body[data-動き="なし"] #本体::after { animation: none !important; opacity: 0 !important; }
 /* なし：動きを全部止め、配線の光の絵も外し、透かしの処理（重い）もやめる */
-html:has(body[data-動き="なし"])::after { animation: none !important; background: radial-gradient(ellipse at 50% 40%, transparent 0 45%, rgba(0, 0, 0, .55) 100%) !important; }
+html[data-動き="なし"]::after { animation: none !important; background: radial-gradient(ellipse at 50% 40%, transparent 0 45%, rgba(0, 0, 0, .55) 100%) !important; }
 body[data-動き="なし"] *, body[data-動き="なし"] *::before, body[data-動き="なし"] *::after { animation: none !important; transition: none !important; }
-body[data-動き="なし"] .lp-窓, body[data-動き="なし"] #本体, body[data-動き="なし"] .カード { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+body[data-動き="少ない"] .lp-窓, body[data-動き="少ない"] #本体, body[data-動き="少ない"] .カード, body[data-動き="少ない"] .lp-中,
+body[data-動き="なし"] .lp-窓, body[data-動き="なし"] #本体, body[data-動き="なし"] .カード  { /* 少ない・なし：背景ぼかし（重い）は使わない */ -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 
 /* ================= 12. 動きを減らす設定 ================= */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+
+/* ================= 15. 機能の切り替え（右上の ☰ → 全画面メニュー。下のタブは、よく使う4つ＋「その他」） ================= */
+#メニュー鈕, #メニュー鈕:not(nav#タブ button) { position: fixed !important; top: calc(env(safe-area-inset-top, 0px) + 8px) !important; right: 8px !important; left: auto !important; bottom: auto !important; margin: 0 !important; z-index: 900; width: 46px !important; height: 46px !important; min-width: 0 !important; padding: 0; font-size: 24px; line-height: 1; color: var(--lp-色, #ffd36b) !important; background: rgba(6, 9, 13, .86) !important; border: 1px solid var(--lp-色, #ffd36b) !important; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+#メニュー { position: fixed; inset: 0; z-index: 1000; overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 30px; background: rgba(4, 6, 10, .995); }
+#メニュー[hidden] { display: none; }
+#メニュー .メニュー頭 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-family: var(--lp-等幅), var(--lp-字); letter-spacing: .12em; color: #f3e9c9; }
+#メニュー .メニュー閉じる { width: 46px !important; height: 46px !important; min-width: 0 !important; padding: 0; font-size: 22px; color: #f3e9c9 !important; background: transparent !important; border: 1px solid rgba(243, 233, 201, .5) !important; }
+#メニュー .メニュー組 { margin-top: 16px; }
+#メニュー .メニュー組名 { font-size: 12px; letter-spacing: .22em; color: var(--lp-色, #ffd36b); border-bottom: 1px dashed rgba(243, 233, 201, .3); padding-bottom: 5px; margin-bottom: 9px; }
+#メニュー .メニュー格子 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+#メニュー .メニュー項 { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-height: 64px; padding: 10px 12px; text-align: left; color: #f3e9c9 !important; background: rgba(20, 26, 32, .9) !important; border: 1px solid rgba(243, 233, 201, .28) !important; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%); }
+#メニュー .メニュー項 .名 { font-size: 15px; font-family: var(--lp-字); }
+#メニュー .メニュー項 .説 { font-size: 11px; opacity: .65; }
+#メニュー .メニュー項.今 { background: #f3e9c9 !important; color: #10151a !important; }
+#メニュー .メニュー項.今 .説 { opacity: .8; }
+html[data-動き="なし"] #メニュー, html[data-動き="少ない"] #メニュー { -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* ================= 15b. 起動時のアンケート（体と気分。アプリを開いた時に1回） ================= */
+#起動アンケート { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(4, 6, 10, .9); overflow-y: auto; }
+#起動アンケート .カード { width: 100%; max-width: 420px; background: rgba(14, 19, 24, .98) !important; }
+#起動アンケート .選択 { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
+
+/* ================= 15c. メモ（iPhone のメモ風：一覧は1行目が題、タップで書く画面、右下に＋） ================= */
+.メモ検索 { width: 100%; box-sizing: border-box; font-size: 16px; }
+.メモ一覧 { padding: 0 !important; }
+.メモ行 { padding: 11px 14px; border-bottom: 1px solid rgba(243, 233, 201, .16); cursor: pointer; }
+.メモ行:last-child { border-bottom: 0; }
+.メモ行:active, .メモ行:focus { background: rgba(243, 233, 201, .08); outline: none; }
+.メモ行 .題 { font-size: 16px; font-weight: bold; color: #f3e9c9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.メモ行 .下 { display: flex; gap: 10px; margin-top: 3px; font-size: 12px; color: rgba(243, 233, 201, .62); }
+.メモ行 .先 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.メモ行 .種 { opacity: .7; }
+.メモ新規, .メモ新規:not(nav#タブ button) { position: fixed !important; right: 16px !important; bottom: calc(env(safe-area-inset-bottom, 0px) + 72px) !important; left: auto !important; top: auto !important; z-index: 800; width: 54px !important; height: 54px !important; min-width: 0 !important; padding: 0 !important; font-size: 30px !important; line-height: 1 !important; color: #10151a !important; background: var(--lp-色, #ffd36b) !important; border: 0 !important; border-radius: 50% !important; clip-path: none !important; box-shadow: 0 2px 14px rgba(0, 0, 0, .6) !important; }
+.メモ頭 { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.メモ本文 { width: 100%; box-sizing: border-box; min-height: 52vh; font-size: 16px; line-height: 1.6; resize: none; }
+.メモ下 { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+html body.lp-スマホ button.メモ新規:not(nav#タブ button):not(.x):not(.y) { background: var(--lp-色, #ffd36b) !important; color: #10151a !important; border: 0 !important; border-radius: 50% !important; clip-path: none !important; }
