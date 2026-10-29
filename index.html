@@ -13,13 +13,13 @@ input,select,textarea{width:100%;padding:9px;font-size:16px;border:1px solid #aa
 .小{font-size:12px;color:var(--sub)} .エラー{color:#b00020} .完了{color:#2a6b2a} .行ボタン{display:flex;flex-wrap:wrap} .選択 button{padding:9px 14px;font-size:15px;margin:3px 5px 3px 0;border:1px solid #888;border-radius:8px;background:#fff} .選択 button.選ばれ{background:var(--accent);color:#fff}
 .時間{font-size:60px;font-weight:bold;font-variant-numeric:tabular-nums;margin:6px 0} .タスク行{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid #eee;padding:8px 0}
 </style>
-<link rel="stylesheet" href="テーマ.css?v=20261028n"></head><body class="lp lp-スマホ" data-地区="港">
+<link rel="stylesheet" href="テーマ.css?v=20261029a"></head><body class="lp lp-スマホ" data-地区="港">
 <main id="本体"></main>
 <nav id="タブ"></nav>
 <button id="メニュー鈕" aria-label="機能を開く" aria-haspopup="dialog">☰</button><div id="メニュー" role="dialog" aria-label="機能の切り替え" hidden></div>
-<script src="core.js?v=20261028n"></script><script src="絵_人物.js?v=20261028n"></script><script src="絵_街.js?v=20261028n"></script><script src="起動画面.js?v=20261028n"></script>
-<script src="drive.js?v=20261028n"></script>
-<script src="calendar.js?v=20261028n"></script>
+<script src="core.js?v=20261029a"></script><script src="絵_人物.js?v=20261029a"></script><script src="絵_街.js?v=20261029a"></script><script src="起動画面.js?v=20261029a"></script>
+<script src="drive.js?v=20261029a"></script>
+<script src="calendar.js?v=20261029a"></script>
 <script>
 // ================= データ（スマホの中に、持つ） =================
 const L = LifePilot, $ = id => document.getElementById(id);
@@ -235,7 +235,7 @@ function Gの予定(日付) {
 }
 function カレンダー画面() {
   if (!暦の年) { const 今 = new Date(); 暦の年 = 今.getFullYear(); 暦の月 = 今.getMonth() + 1; 暦の日 = L.日付文字(今); }
-  const 表 = L.月の表(暦の年, 暦の月, データ.tasks), 一覧 = L.締切の一覧(データ.tasks), 曜日 = ["日", "月", "火", "水", "木", "金", "土"];
+  const 教室表 = L.教室の表(データ), 表 = L.月の表(暦の年, 暦の月, データ.tasks), 一覧 = L.締切の一覧(データ.tasks), 曜日 = ["日", "月", "火", "水", "木", "金", "土"];
   const 行 = x => `<div class="タスク行"><span>${安全(x.タスク.内容)}</span><span class="小" ${x.期限切れ ? 'style="color:#b00020"' : ""}>${x.日付.slice(5).replace("-", "/")} ${x.時刻}（${x.期限切れ ? "期限切れ" : x.残り日 === 0 ? "今日" : "あと" + x.残り日 + "日"}）</span></div>`;
   $("本体").innerHTML = `<h1>カレンダー</h1><p class="小">締切型のタスクの「締切」を、月の表に並べます。日付を押すと、その日の締切が、下に出ます。</p>
     <div class="カード"><div style="display:flex;align-items:center;justify-content:space-between"><button class="押す" id="前" aria-label="前の月">◀</button><b>${暦の年}年${暦の月}月</b><button class="押す" id="次" aria-label="次の月">▶</button></div>
@@ -243,8 +243,9 @@ function カレンダー画面() {
       `<td data-d="${c.日付}" style="height:46px;vertical-align:top;border:1px solid #eee;padding:2px;font-size:12px;${c.日付 === 暦の日 ? "background:#fff1d6;" : ""}${c.今日 ? "outline:2px solid #e08a1e;outline-offset:-2px;" : ""}">${c.日}${c.締切.length ? `<div style="margin-top:2px;border-radius:4px;background:${c.締切.some(x => x.期限切れ) ? "#f3b6b0" : "#f6d9a8"};font-size:10px;text-align:center">${c.締切.length}件</div>` : ""}</td>`).join("") + "</tr>").join("")}</table>
     <button class="押す" id="今日へ">今日</button></div>
     <div class="カード"><b>Googleカレンダー</b><p class="小">ふだんの予定を読み、締切型タスクと「朝の5分」を、頭に「［LP］」を付けた予定として書きます（通知付き）。ふだんの予定は、読むだけです。予定の中身は、このスマホの中だけで使います。</p>
-    <button class="押す 濃" id="Gつなぐ">つなぐ（読む＋反映）</button> <span class="小" id="G状態">${G予定 ? "前回：" + 安全(G予定.取得) + "（" + G予定.予定.length + "件）" : "まだ、つないでいません"}</span></div>
-    <h2>${暦の日.replace(/-/g, "/")} の予定（Google）</h2><div class="カード">${Gの予定(暦の日).map(e => `<div class="タスク行"><span>${安全(e.summary)}</span><span class="小">${(e.start || {}).dateTime ? 安全(e.start.dateTime.slice(11, 16)) : "終日"}</span></div>`).join("") || '<p class="小">' + (G予定 ? "この日の予定は、ありません" : "つなぐと、ここに出ます") + '</p>'}
+    <button class="押す 濃" id="Gつなぐ">つなぐ（読む＋反映）</button> <span class="小" id="G状態">${G予定 ? "前回：" + 安全(G予定.取得) + "（" + G予定.予定.length + "件）" : "まだ、つないでいません"}</span>
+    <label style="display:block;margin-top:8px;font-size:13px"><input type="checkbox" id="夜通知" ${L.カレンダー設定(設定).夜の封の通知 ? "checked" : ""}> 夜（${L.カレンダー設定(設定).夜の封の時}時）に「明日何やる？」の通知を付ける</label><p class="小">入れると、今夜から${L.カレンダー設定(設定).夜の封の日数}日分、［LP］の予定（10分前に通知）を書きます。封をした夜は書きません。次に「つなぐ」を押した時に、反映されます。</p></div>
+    <h2>${暦の日.replace(/-/g, "/")} の予定（Google）</h2><div class="カード">${Gの予定(暦の日).map(e => `<div class="タスク行"><span>${安全(e.summary)}${(r => r ? ' <span class="小">［' + 安全(r) + '］</span>' : "")(L.教室を探す(e.summary, 教室表))}</span><span class="小">${(e.start || {}).dateTime ? 安全(e.start.dateTime.slice(11, 16)) : "終日"}</span></div>`).join("") || '<p class="小">' + (G予定 ? "この日の予定は、ありません" : "つなぐと、ここに出ます") + '</p>'}
     ${G予定 ? (() => { const 空 = L.空き時間(G予定.予定, 暦の日, 設定); return '<p class="小">空き時間（8〜22時）：' + (空.map(x => x.開始 + "〜" + x.終了 + "（" + x.分 + "分）").join("、") || "なし") + "</p>"; })() : ""}
     ${G予定 && 暦の日 === L.日付文字(new Date()) ? (() => { const 今 = L.今の空き(G予定.予定, new Date(), 設定); return '<p class="小">いまから次の予定まで：' + 今.分 + "分" + (今.選択 ? ' <button class="押す" id="空きで提案">「今なにする？」を ' + 今.選択 + "分で出す</button>" : "") + "</p>"; })() : ""}</div>
     <h2>${暦の日.replace(/-/g, "/")} の締切</h2><div class="カード">${一覧.filter(x => x.日付 === 暦の日).map(行).join("") || '<p class="小">この日の締切は、ありません</p>'}
@@ -256,6 +257,7 @@ function カレンダー画面() {
   $("本体").querySelectorAll("td[data-d]").forEach(td => td.onclick = () => { 暦の日 = td.dataset.d; カレンダー画面(); });
   $("足す").onclick = () => { 取っておく下書き = { 種類: "締切", 締切: 暦の日 + "T23:59" }; 移る("タスク"); };
   $("Gつなぐ").onclick = Googleへつなぐ;
+  $("夜通知").onchange = () => { 設定.カレンダー = Object.assign({}, 設定.カレンダー, { 夜の封の通知: $("夜通知").checked }); try { localStorage.setItem("lifepilot_settings", JSON.stringify(設定)); } catch (e) {} 出す($("夜通知").checked ? "夜の通知を入れました。「つなぐ」を押すと反映されます" : "夜の通知を切りました。「つなぐ」を押すと、書いた予定が消えます"); };
   if ($("空きで提案")) $("空きで提案").onclick = () => { 今の空き = L.今の空き(G予定.予定, new Date(), 設定).選択; 移る("提案"); };
 }
 
