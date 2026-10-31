@@ -1,17 +1,23 @@
 // 起動画面（Mac・スマホ共通）。暗い街に、港・広場・穴の順に灯りがつく → LIFEPILOT の文字 → エルピーの一言。約3秒。タップ・キーで飛ばせる。
-// 出す回数：開いたブラウザ（スマホはアプリを開くたび）に1回。設定「見た目→起動画面」を false にすると出さない。
+// 出す回数：1日の最初の1回だけ（画面を移るたびには出さない。開いたブラウザ・アプリの1回の起動でも1回）。設定「見た目→起動画面」を false にすると出さない。
+// 街の絵：設定「見た目→隠す機能」に「街の地図」が入っている間（既定）は、街の絵と灯りは出さず、LIFEPILOT の文字と一言だけ出す。
 // 背景の動きが「なし」（か、端末が動きを減らす設定）の時は、動かさず、出きった絵だけを短く出す。
 (() => {
   const 読む = 鍵 => { try { return localStorage.getItem(鍵); } catch (e) { return null; } };
-  try { if (sessionStorage.getItem("lp_起動済")) return; sessionStorage.setItem("lp_起動済", "1"); } catch (e) {}
+  const 今 = new Date(), 日 = 今.getFullYear() + "-" + String(今.getMonth() + 1).padStart(2, "0") + "-" + String(今.getDate()).padStart(2, "0");
+  try { if (sessionStorage.getItem("lp_起動済") || localStorage.getItem("lp_起動日") === 日) return; sessionStorage.setItem("lp_起動済", "1"); } catch (e) {}
   // 自動操作の画面（試験・撮影）では出さない。見たい時は、アドレスの最後に #起動=見る
   if (navigator.webdriver && !/起動=見る/.test(location.href)) return;
   const b = document.body; if (!b) return;
   let 設定 = {}; try { 設定 = (JSON.parse(読む("lifepilot_settings") || "{}").見た目) || {}; } catch (e) {}
   if (b.dataset.起動 === "なし" || 設定.起動画面 === false) return;
+  const 隠す = (b.dataset.隠す !== undefined ? b.dataset.隠す.split(",") : Array.isArray(設定.隠す機能) ? 設定.隠す機能 : ["ニュース", "使った機能", "街の地図", "実験室"]);      // Mac は サーバーが body に入れる。スマホは設定。項目がなければ既定（隠す）
+  const 街を出す = !隠す.includes("街の地図");
+  try { localStorage.setItem("lp_起動日", 日); } catch (e) {}          // 今日はもう出した（同じ日の次の画面・次の起動では出さない）
   const 動き = b.dataset.動き || 読む("lifepilot_motion") || 設定.背景の動き || "多い";
   const 静止 = 動き === "なし" || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
-  const 一言 = ["起きたか、パイロット。", "灯りは足りねえが、街は待ってた。", "五分でいい。始めようぜ。", "今日の俺の機嫌は、お前の点数しだいだ。"];
+  let 見せる = b.dataset.点顔 === "見せる"; if (!見せる) try { 見せる = !!((JSON.parse(読む("lifepilot_settings") || "{}").エルピー) || {}).点数と顔を見せる; } catch (e) {}      // 点数と顔を隠している間は、点数の一言を出さない
+  const 一言 = ["起きたか、パイロット。", "灯りは足りねえが、街は待ってた。", "五分でいい。始めようぜ。"].concat(見せる ? ["今日の俺の機嫌は、お前の点数しだいだ。"] : []);
   const 文 = 一言[Math.floor(Math.random() * 一言.length)];
   const 灯 = [[71, 88, "港"], [52, 44, "広場"], [76, 53, "穴"]];     // 街の絵の上の位置（%）
   const 遅れ = 静止 ? [0, 0, 0] : [0.5, 1.0, 1.5];
@@ -34,7 +40,7 @@ ${静止 ? "" : `
 #起動 .起言{animation:点く .6s ease-out 2.3s forwards}`}`;
   const 要素 = document.createElement("div");
   要素.id = "起動"; 要素.setAttribute("aria-hidden", "true");
-  要素.innerHTML = `<div class="起絵"><img src="絵/街.jpg" alt="">${灯.map((p, i) => `<div class="起灯" style="left:${p[0]}%;top:${p[1]}%;animation-delay:${遅れ[i]}s"></div>`).join("")}</div><div class="起題">LIFEPILOT</div><div class="起言"></div><div class="起飛">TAP TO SKIP</div>`;
+  要素.innerHTML = `${街を出す ? `<div class="起絵"><img src="絵/街.jpg" alt="">${灯.map((p, i) => `<div class="起灯" style="left:${p[0]}%;top:${p[1]}%;animation-delay:${遅れ[i]}s"></div>`).join("")}</div>` : ""}<div class="起題">LIFEPILOT</div><div class="起言"></div><div class="起飛">TAP TO SKIP</div>`;
   要素.querySelector(".起言").textContent = 文;
   let 済 = false;
   const 閉じる = () => { if (済) return; 済 = true; 要素.classList.add("消える"); setTimeout(() => { 要素.remove(); css.remove(); }, 450); };
